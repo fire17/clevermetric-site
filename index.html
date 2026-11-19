@@ -196,7 +196,7 @@ function build(c, screen){
   };
   var numSize = function(k){ return a["n"+rank(k)]; };
   // EXT: body extension left of 0 holding the split-triangle "the mark is the edge" sign
-  var EXT = 3.3, X0e = X0 + EXT * S;   // body starts at -4.6 mm
+  var EXT = 2.0, X0e = X0 + EXT * S;   // body starts at -3.3 mm
   var W = Math.floor(X0e + (span + 2.0) * S);
   var X = function(mm){ return X0e + mm * S; };
   var bl = -1.3 - EXT, br = span + 1.6, edge = EDGE_Y, top = BODY_TOP;
@@ -255,8 +255,8 @@ function build(c, screen){
   // edge sign: a vertical split through the extension. Left of it the background is the
   // mark colour, right of it the ruler body; each triangle half takes the opposite colour,
   // so the black/blank switch reads both inside and outside the triangle.
-  // exact metric sign (Tami): side 2 mm (half-side 1 mm), centre and split on -3 mm
-  var tc = X(-3), side = 2 * S, th = side * Math.sqrt(3) / 2;
+  // exact metric sign (Tami): side 1 mm (half-width 0.5 mm), centre and split on -2 mm
+  var tc = X(-2), side = 1 * S, th = side * Math.sqrt(3) / 2;
   var tmid = (top + edge) / 2, ta = tmid - th / 2, tb = tmid + th / 2;
   var bodySolid = t.body[2][1];
   o.push('<rect x="'+g(bx0)+'" y="'+top+'" width="'+g(tc - bx0)+'" height="'+bh+'" fill="url(#ink)" shape-rendering="crispEdges"/>');
