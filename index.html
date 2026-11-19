@@ -300,6 +300,12 @@ function build(c, screen){
     var lw = X(4.55) - X(1), lh = lw * 116 / 488;   // stays clear of the 5 numeral
     o.push('<image href="'+(c.t === "invert" ? LOGO_LIGHT : LOGO_DARK)+'" x="'+g(X(1))+'" y="'+g(top + 20)+'" width="'+g(lw)+'" height="'+g(lh)+'"/>');
   }
+  if (c.g === "1" && span >= 9){
+    // "Clevemetric" wordmark (no r), styled to sit with the FastCap mark: heavy italic sans, same ink and band
+    var wx0 = X(5.5), wx1 = X(9), wcap = (X(4.55) - X(1)) * 116 / 488;
+    o.push('<text x="'+g((wx0 + wx1) / 2)+'" y="'+g(top + 20 + wcap * 0.78)+'" text-anchor="middle" textLength="'+g(wx1 - wx0)+'" lengthAdjust="spacingAndGlyphs" ' +
+      'font-family="\'Arial Black\', \'Helvetica Neue\', Arial, sans-serif" font-weight="900" font-style="italic" font-size="'+g(wcap * 0.62)+'" fill="'+t.num+'">Clevemetric</text>');
+  }
   var lastShown = false;
   for (var n = 0; n <= span; n++){
     var k = n % 10;
