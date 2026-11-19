@@ -180,7 +180,8 @@ var THEMES = {
 var ADV = {   // ruler.py defaults
   g0:2.55, g5:2.05, g3:1.58, g2:1.22, g1:0.88, gh:0.55,
   n0:82, n5:62, n3:44, n2:40, n1:38,
-  b:0.34, w:0.09
+  b:0.34, w:0.09,
+  ts:1, tx:-2, dd:0.465, dg:0.287, ty:0   // edge sign: triangle side, centre x, dot diameter, gap, vertical shift (mm)
 };
 
 function g(x){ return String(+(+x).toFixed(3)); }   // python's :g for our ranges
@@ -256,13 +257,20 @@ function build(c, screen){
   // mark colour, right of it the ruler body; each triangle half takes the opposite colour,
   // so the black/blank switch reads both inside and outside the triangle.
   // exact metric sign (Tami): side 1 mm (half-width 0.5 mm), centre and split on -2 mm
-  var tc = X(-2), side = 1 * S, th = side * Math.sqrt(3) / 2;
-  var tmid = (top + edge) / 2, ta = tmid - th / 2, tb = tmid + th / 2;
+  // default proportions form a golden rectangle: width = side, total height (dot+gap+triangle) = phi * side,
+  // and the dot:gap split is golden too. The whole group is centred vertically on the body.
+  var tc = X(a.tx), side = a.ts * S, th = side * Math.sqrt(3) / 2, dd = a.dd * S, dg = a.dg * S;
+  var groupH = th + (dd > 0 ? dg + dd : 0);
+  var gTop = (top + edge) / 2 - groupH / 2 - a.ty * S;
+  var ta = gTop + (dd > 0 ? dd + dg : 0), tb = ta + th, dcy = gTop + dd / 2;
   var bodySolid = t.body[2][1];
   o.push('<rect x="'+g(bx0)+'" y="'+top+'" width="'+g(tc - bx0)+'" height="'+bh+'" fill="url(#ink)" shape-rendering="crispEdges"/>');
   o.push('<g shape-rendering="geometricPrecision">' +
     '<path d="M'+g(tc)+','+g(ta)+' L'+g(tc)+','+g(tb)+' L'+g(tc - side/2)+','+g(tb)+' Z" fill="'+bodySolid+'"/>' +
     '<path d="M'+g(tc)+','+g(ta)+' L'+g(tc + side/2)+','+g(tb)+' L'+g(tc)+','+g(tb)+' Z" fill="'+t.ink+'"/>' +
+    (dd > 0 ?
+      '<path d="M'+g(tc)+','+g(dcy - dd/2)+' A'+g(dd/2)+','+g(dd/2)+' 0 0 0 '+g(tc)+','+g(dcy + dd/2)+' Z" fill="'+bodySolid+'"/>' +
+      '<path d="M'+g(tc)+','+g(dcy - dd/2)+' A'+g(dd/2)+','+g(dd/2)+' 0 0 1 '+g(tc)+','+g(dcy + dd/2)+' Z" fill="'+t.ink+'"/>' : '') +
     '</g>');
   o.push('<rect x="'+g(bx0)+'" y="'+top+'" width="'+g(bw)+'" height="2" fill="'+t.hi+'" opacity="'+t.hi_op+'"/>');
   o.push('</g>');
@@ -339,7 +347,10 @@ var ADV_UI = [
   ["n0","0 / 10",12,120,1], ["n5","5",12,120,1], ["n3","3 / 8",12,120,1],
   ["n2","2 / 7",12,120,1], ["n1","1 / 4 / 6 / 9",12,120,1],
   ["h","פס"],
-  ["b","עומק בלוק (מ״מ)",0.1,1,0.01], ["w","רוחב רגל (מ״מ)",0.03,0.3,0.005]
+  ["b","עומק בלוק (מ״מ)",0.1,1,0.01], ["w","רוחב רגל (מ״מ)",0.03,0.3,0.005],
+  ["h","סימן הקצה: משולש ונקודה (מ״מ)"],
+  ["ts","צלע משולש",0.3,3,0.01], ["tx","מיקום (מרכז)",-3,-0.5,0.05], ["ty","הזזה למעלה",-1.2,1.2,0.01],
+  ["dd","קוטר נקודה (0 = בלי)",0,1.5,0.005], ["dg","מרווח לנקודה",0,1.5,0.005]
 ];
 var advEl = document.getElementById("adv"), advInputs = {};
 ADV_UI.forEach(function(d){
