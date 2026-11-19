@@ -276,12 +276,19 @@ function build(c, screen){
   o.push('<rect x="'+g(bx0+18)+'" y="'+(top+34)+'" width="'+g(bw-36)+'" height="'+bh+'" rx="'+RADIUS+'" fill="'+shadowFill+'" opacity="'+t.shadow_op+'" filter="url(#soft)"/>');
   o.push('<rect x="'+g(bx0+2)+'" y="'+(top+4)+'" width="'+g(bw-4)+'" height="'+bh+'" rx="'+RADIUS+'" fill="#1c1f23" opacity="0.30" filter="url(#contact)"/>');
   o.push('<g clip-path="url(#body)">');
-  o.push('<rect x="'+g(bx0)+'" y="'+top+'" width="'+g(bw)+'" height="'+bh+'" fill="url(#steel)"/>');
-  o.push('<rect x="'+g(bx0)+'" y="'+top+'" width="'+g(bw)+'" height="'+bh+'" filter="url(#grain)" opacity="'+t.grain+'"/>');
-  o.push('<rect x="'+g(bx0)+'" y="'+top+'" width="'+g(bw)+'" height="'+bh+'" fill="url(#sheen)"/>');
-  o.push('<g fill="url(#ink)" shape-rendering="crispEdges">');
-  for (var p = -res; p < br; p += 2 * res) o.push('<path d="'+band(p)+'"/>');
-  o.push('</g>');
+  // c.sw = swapped materials inside the same design (Tami): metal (steel+grain+sheen) <-> mark (ink)
+  var SW = !!c.sw, TX = [];
+  function txt(t_){ (SW ? TX : o).push(t_); }
+  var BR = 'x="'+g(bx0)+'" y="'+top+'" width="'+g(bw)+'" height="'+bh+'"';
+  function metal(clipId){
+    return '<g'+(clipId ? ' clip-path="url(#'+clipId+')"' : '')+'><rect '+BR+' fill="url(#steel)"/>' +
+      '<rect '+BR+' filter="url(#grain)" opacity="'+t.grain+'"/><rect '+BR+' fill="url(#sheen)"/></g>';
+  }
+  o.push(SW ? '<rect '+BR+' fill="url(#ink)"/>' : metal());
+  var bandPaths = '';
+  for (var p = -res; p < br; p += 2 * res) bandPaths += '<path d="'+band(p)+'"/>';
+  if (SW) o.push('<clipPath id="bandclip">'+bandPaths+'</clipPath>' + metal('bandclip'));
+  else o.push('<g fill="url(#ink)" shape-rendering="crispEdges">'+bandPaths+'</g>');
   // edge sign: a vertical split through the extension. Left of it the background is the
   // mark colour, right of it the ruler body; each triangle half takes the opposite colour,
   // so the black/blank switch reads both inside and outside the triangle.
@@ -303,13 +310,14 @@ function build(c, screen){
   }
   function paint(v, shape){
     v = resolve(v);
+    if (SW) v = v === "mark" ? "body" : v === "body" ? "mark" : v;
     if (v !== "mark" && v !== "body") return shape.replace("/>", ' fill="'+v+'"/>');
     var id = "sg" + (cpN++), clip = '<clipPath id="'+id+'">'+shape+'</clipPath>';
     if (v === "mark") return clip + '<rect '+BODY_RECT+' fill="url(#ink)" clip-path="url(#'+id+')"/>';
     return clip + '<g clip-path="url(#'+id+')"><rect '+BODY_RECT+' fill="url(#steel)"/>' +
       '<rect '+BODY_RECT+' filter="url(#grain)" opacity="'+t.grain+'"/><rect '+BODY_RECT+' fill="url(#sheen)"/></g>';
   }
-  o.push('<rect x="'+g(bx0)+'" y="'+top+'" width="'+g(tc - bx0)+'" height="'+bh+'" fill="url(#ink)" shape-rendering="crispEdges"/>');
+  o.push(paint("mark", '<rect x="'+g(bx0)+'" y="'+top+'" width="'+g(tc - bx0)+'" height="'+bh+'"/>'));
   // layer order (Tami): dot outline at the bottom, both triangle halves over it, the dot itself on top.
   // The outline grows outward from the dot, so the dot is never covered at any thickness.
   var tri = '<g shape-rendering="geometricPrecision">';
@@ -326,13 +334,15 @@ function build(c, screen){
   o.push('</g>');
   if (c.g === "1" && span >= 5){
     var lw = X(4.55) - X(1), lh = lw * 116 / 488;   // stays clear of the 5 numeral
-    o.push('<image href="'+(c.t === "invert" ? LOGO_LIGHT : LOGO_DARK)+'" x="'+g(X(1))+'" y="'+g(top + 20)+'" width="'+g(lw)+'" height="'+g(lh)+'"/>');
+    var limg = 'x="'+g(X(1))+'" y="'+g(top + 20)+'" width="'+g(lw)+'" height="'+g(lh)+'"';
+    if (SW) o.push('<mask id="logomask" maskUnits="userSpaceOnUse" '+BR+'><image href="'+LOGO_LIGHT+'" '+limg+'/></mask><g mask="url(#logomask)">'+metal()+'</g>');
+    else o.push('<image href="'+(c.t === "invert" ? LOGO_LIGHT : LOGO_DARK)+'" '+limg+'/>');
   }
   if (c.g === "1" && span >= 9){
     // "Clevemetric" wordmark (no r), styled to sit with the FastCap mark: heavy italic sans, same ink and band
     // baseline = the FastCap letters' baseline (row 104 of the 116-row logo mask; only the p descender goes lower)
     var wx0 = X(5.5), wx1 = X(9), wcap = (X(4.55) - X(1)) * 116 / 488;
-    o.push('<text x="'+g((wx0 + wx1) / 2)+'" y="'+g(top + 20 + wcap * 104 / 116)+'" text-anchor="middle" textLength="'+g(wx1 - wx0)+'" lengthAdjust="spacingAndGlyphs" ' +
+    txt('<text x="'+g((wx0 + wx1) / 2)+'" y="'+g(top + 20 + wcap * 104 / 116)+'" text-anchor="middle" textLength="'+g(wx1 - wx0)+'" lengthAdjust="spacingAndGlyphs" ' +
       'font-family="\'Arial Black\', \'Helvetica Neue\', Arial, sans-serif" font-weight="900" font-style="italic" font-size="'+g(wcap * 0.62)+'" fill="'+t.num+'">Clevemetric</text>');
   }
   var lastShown = false;
@@ -341,7 +351,7 @@ function build(c, screen){
     if (c.l === "key" && k !== 0 && k !== 5) continue;
     var col = (k === 0 || k === 5) ? t.num : t.sub;
     var base = edge - leg(n) * S - NUM_GAP;
-    o.push('<text x="'+g(X(n))+'" y="'+g(base)+'" text-anchor="middle" font-family="'+FONT+'" font-size="'+numSize(k)+'" font-weight="700" fill="'+col+'">'+fmt(n, c.u)+'</text>');
+    txt('<text x="'+g(X(n))+'" y="'+g(base)+'" text-anchor="middle" font-family="'+FONT+'" font-size="'+numSize(k)+'" font-weight="700" fill="'+col+'">'+fmt(n, c.u)+'</text>');
     if (n === span) lastShown = true;
   }
   // unit tag: ruler.py's offset, pushed right only when a wide last numeral would collide
@@ -351,7 +361,8 @@ function build(c, screen){
     var half = (digits * 0.55 + dots * 0.28) * numSize(span % 10) / 2;
     ux = Math.max(ux, half + 14);
   }
-  o.push('<text x="'+g(X(span) + ux)+'" y="'+g(edge - leg(span) * S - NUM_GAP)+'" text-anchor="start" font-family="'+FONT+'" font-size="30" fill="'+t.sub+'" letter-spacing="1">'+c.u+'</text>');
+  txt('<text x="'+g(X(span) + ux)+'" y="'+g(edge - leg(span) * S - NUM_GAP)+'" text-anchor="start" font-family="'+FONT+'" font-size="30" fill="'+t.sub+'" letter-spacing="1">'+c.u+'</text>');
+  if (SW && TX.length) o.push('<clipPath id="textclip">'+TX.join("")+'</clipPath>' + metal('textclip'));
   o.push('</svg>');
   return { svg: o.join("\n"), W: W, X0: X0e };
 }
@@ -585,7 +596,7 @@ function flipPolys(st, W, X0){
 }
 function composite(st){
   var base = build(st, null);
-  var inv = build(Object.assign({}, st, { t: st.t === "flip" ? "invert" : "flip" }), null);
+  var inv = build(Object.assign({}, st, { sw: true }), null);   // same design, materials swapped
   var inner = inv.svg.replace(/^<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "")
     .replace(/id="([^"]+)"/g, 'id="inv-$1"').replace(/url\(#([^)]+)\)/g, 'url(#inv-$1)');
   var pp = flipPolys(st, base.W, base.X0);
