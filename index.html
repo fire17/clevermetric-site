@@ -37,6 +37,13 @@ header p{margin:0;color:var(--muted);font-size:14px}
 .scroller{width:100%;max-width:100%;overflow-x:auto;overflow-y:hidden;direction:ltr;-webkit-overflow-scrolling:touch;
   overscroll-behavior-x:contain;scrollbar-width:thin}
 .scroller svg{display:block}
+.wipe{position:relative;display:inline-block;vertical-align:top}
+.wipe .inv{position:absolute;inset:0;pointer-events:none}
+.wipe .inv svg{display:block}
+.wipe .handle{position:absolute;top:0;bottom:0;width:0;border-left:2px solid #e8590c;cursor:ew-resize;z-index:2}
+.wipe .handle::after{content:"⇆";position:absolute;top:50%;left:-17px;width:32px;height:32px;margin-top:-16px;border-radius:50%;
+  background:#e8590c;color:#fff;font:700 16px/32px system-ui,sans-serif;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.35)}
+.wipe .grab{position:absolute;top:0;bottom:0;width:44px;margin-left:-22px;cursor:ew-resize;z-index:3;touch-action:none}
 .hint{direction:rtl;font-size:12.5px;color:var(--muted);padding:6px 14px 8px;display:none}
 .hint.on{display:block}
 
@@ -326,8 +333,8 @@ function hierarchy(c){
 window.__clever = { build: build, hierarchy: hierarchy, ADV: ADV };   // for tests
 
 /* ===== state + URL hash ===== */
-var DEF = { t:"flip", r:1, u:"mm", l:"all", s:10, df:DOT_COL.fill, dl:DOT_COL.line, g:"1" };
-var state = { t:DEF.t, r:DEF.r, u:DEF.u, l:DEF.l, s:DEF.s, df:DEF.df, dl:DEF.dl, g:DEF.g, adv: Object.assign({}, ADV) };
+var DEF = { t:"flip", r:1, u:"mm", l:"all", s:10, df:DOT_COL.fill, dl:DOT_COL.line, g:"1", wp:0 };
+var state = { t:DEF.t, r:DEF.r, u:DEF.u, l:DEF.l, s:DEF.s, df:DEF.df, dl:DEF.dl, g:DEF.g, wp:DEF.wp, adv: Object.assign({}, ADV) };
 var COL_OK = /^(mark|body|#[0-9a-fA-F]{3,8})$/;
 
 function readHash(){
@@ -341,6 +348,7 @@ function readHash(){
     if (q.u === "mm" || q.u === "cm") state.u = q.u;
     if (q.l === "all" || q.l === "key") state.l = q.l;
     if (q.g === "0" || q.g === "1") state.g = q.g;
+    if (q.wp && isFinite(+q.wp)) state.wp = Math.max(0, Math.min(100, +q.wp));
     if (q.s && isFinite(+q.s)) state.s = Math.max(10, Math.min(300, Math.round(+q.s)));
     Object.keys(ADV).forEach(function(k){ if (q[k] != null && isFinite(+q[k])) state.adv[k] = +q[k]; });
     if (q.df && COL_OK.test(q.df)) state.df = q.df;
@@ -351,6 +359,7 @@ function writeHash(){
   try {
     var parts = ["t="+state.t, "r="+state.r, "u="+state.u, "l="+state.l, "s="+state.s];
     if (state.g !== DEF.g) parts.push("g="+state.g);
+    if (state.wp) parts.push("wp="+(+state.wp).toFixed(1));
     Object.keys(ADV).forEach(function(k){ if (state.adv[k] !== ADV[k]) parts.push(k+"="+state.adv[k]); });
     if (state.df !== DEF.df) parts.push("df="+encodeURIComponent(state.df));
     if (state.dl !== DEF.dl) parts.push("dl="+encodeURIComponent(state.dl));
@@ -446,17 +455,45 @@ function render(){
   pending = false;
   syncControls();
   var out = build(state, { dark: !!(mq && mq.matches) });
-  if (out.svg !== lastSvg){ scroller.innerHTML = out.svg; lastSvg = out.svg; }
-  var el = scroller.firstElementChild, k = scale(out.W);
-  el.setAttribute("width", Math.round(out.W * k));
-  el.setAttribute("height", Math.round(H * k));
-  el.setAttribute("role", "img");
+  var inv = build(Object.assign({}, state, { t: state.t === "flip" ? "invert" : "flip" }), null);
+  var key = out.svg + "|" + inv.svg;
+  if (key !== lastSvg){
+    // ids inside the inverted copy must not collide with the base copy
+    var invSvg = inv.svg.replace(/id="([^"]+)"/g, 'id="inv-$1"').replace(/url\(#([^)]+)\)/g, 'url(#inv-$1)');
+    scroller.innerHTML = '<div class="wipe" id="wipe">' + out.svg + '<div class="inv" id="inv">' + invSvg +
+      '</div><div class="handle" id="handle"></div><div class="grab" id="grab"></div></div>';
+    lastSvg = key; bindWipe();
+  }
+  var k = scale(out.W), wpx = Math.round(out.W * k), hpx = Math.round(H * k);
+  document.querySelectorAll("#wipe svg").forEach(function(el){
+    el.setAttribute("width", wpx); el.setAttribute("height", hpx); el.setAttribute("role", "img");
+  });
+  placeWipe();
   hint.classList.toggle("on", out.W * k > scroller.clientWidth + 1);
   var m = hierarchy(state);
   warnEl.classList.toggle("on", m.length > 0);
   warnEl.innerHTML = m.length ? "⚠ ההיררכיה נשברה (0/10 > 5 > 3/8 > 2/7 > 1/4/6/9 > ½) — מוצג בכל זאת:<ul>" +
     m.map(function(x){ return "<li>" + x + "</li>"; }).join("") + "</ul>" : "";
   writeHash();
+}
+/* invert wipe: left of the handle shows the opposite colour scheme */
+function placeWipe(){
+  var p = state.wp, invEl = document.getElementById("inv");
+  if (!invEl) return;
+  invEl.style.clipPath = "inset(0 " + (100 - p) + "% 0 0)";
+  invEl.style.webkitClipPath = invEl.style.clipPath;
+  document.getElementById("handle").style.left = p + "%";
+  document.getElementById("grab").style.left = p + "%";
+}
+function bindWipe(){
+  var wipe = document.getElementById("wipe"), grab = document.getElementById("grab"), drag = false;
+  function at(e){
+    var r = wipe.getBoundingClientRect(), x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+    state.wp = Math.max(0, Math.min(100, x / r.width * 100)); placeWipe();
+  }
+  grab.addEventListener("pointerdown", function(e){ drag = true; grab.setPointerCapture(e.pointerId); e.preventDefault(); });
+  grab.addEventListener("pointermove", function(e){ if (drag) at(e); });
+  grab.addEventListener("pointerup", function(){ drag = false; writeHash(); });
 }
 function schedule(){
   if (pending) return; pending = true;
