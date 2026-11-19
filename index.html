@@ -350,8 +350,8 @@ function hierarchy(c){
 window.__clever = { build: build, hierarchy: hierarchy, ADV: ADV };   // for tests
 
 /* ===== state + URL hash ===== */
-var DEF = { t:"flip", r:1, u:"mm", l:"all", s:10, df:DOT_COL.fill, dl:DOT_COL.line, g:"1", wp:0 };
-var state = { t:DEF.t, r:DEF.r, u:DEF.u, l:DEF.l, s:DEF.s, df:DEF.df, dl:DEF.dl, g:DEF.g, wp:DEF.wp, adv: Object.assign({}, ADV) };
+var DEF = { t:"flip", r:1, u:"mm", l:"all", s:10, df:DOT_COL.fill, dl:DOT_COL.line, g:"1", wp:0, wa:0, wv:"1" };
+var state = { t:DEF.t, r:DEF.r, u:DEF.u, l:DEF.l, s:DEF.s, df:DEF.df, dl:DEF.dl, g:DEF.g, wp:DEF.wp, wa:DEF.wa, wv:DEF.wv, adv: Object.assign({}, ADV) };
 var COL_OK = /^(mark|body|#[0-9a-fA-F]{3,8})$/;
 
 function readHash(){
@@ -366,6 +366,8 @@ function readHash(){
     if (q.l === "all" || q.l === "key") state.l = q.l;
     if (q.g === "0" || q.g === "1") state.g = q.g;
     if (q.wp && isFinite(+q.wp)) state.wp = Math.max(0, Math.min(100, +q.wp));
+    if (q.wa && isFinite(+q.wa)) state.wa = Math.max(-60, Math.min(60, +q.wa));
+    if (q.wv === "0" || q.wv === "1") state.wv = q.wv;
     if (q.s && isFinite(+q.s)) state.s = Math.max(10, Math.min(300, Math.round(+q.s)));
     Object.keys(ADV).forEach(function(k){ if (q[k] != null && isFinite(+q[k])) state.adv[k] = +q[k]; });
     if (q.df && COL_OK.test(q.df)) state.df = q.df;
@@ -377,6 +379,8 @@ function writeHash(){
     var parts = ["t="+state.t, "r="+state.r, "u="+state.u, "l="+state.l, "s="+state.s];
     if (state.g !== DEF.g) parts.push("g="+state.g);
     if (state.wp) parts.push("wp="+(+state.wp).toFixed(1));
+    if (state.wa) parts.push("wa="+(+state.wa).toFixed(1));
+    if (state.wv !== DEF.wv) parts.push("wv="+state.wv);
     Object.keys(ADV).forEach(function(k){ if (state.adv[k] !== ADV[k]) parts.push(k+"="+state.adv[k]); });
     if (state.df !== DEF.df) parts.push("df="+encodeURIComponent(state.df));
     if (state.dl !== DEF.dl) parts.push("dl="+encodeURIComponent(state.dl));
@@ -415,6 +419,26 @@ function addRow(d, host){
 }
 ADV_UI.forEach(function(d){ addRow(d, advEl); });
 EDGE_UI.forEach(function(d){ addRow(d, document.getElementById("edgeAdv")); });
+/* orange split line: show/hide, position, angle */
+var lineEls = {}, edgeHost = document.getElementById("edgeAdv");
+(function(){
+  var h = document.createElement("h3"); h.textContent = "הקו הכתום (הפיכת צבעים)"; edgeHost.appendChild(h);
+  var seg = document.createElement("div"); seg.className = "seg"; seg.setAttribute("role", "radiogroup");
+  seg.innerHTML = '<label><input type="radio" name="wv" value="1"><span>מוצג</span></label><label><input type="radio" name="wv" value="0"><span>מוסתר</span></label>';
+  edgeHost.appendChild(seg);
+  seg.querySelectorAll("input").forEach(function(el){ el.addEventListener("change", function(){ state.wv = el.value; placeWipe(); writeHash(); }); });
+  [["wp","מיקום הקו (% מאורך הסרגל)",0,100,0.1,1],["wa","זווית הקו (מעלות)",-60,60,0.5,1]].forEach(function(d){
+    var row = document.createElement("div"); row.className = "row";
+    row.innerHTML = '<div class="label"><span></span><b></b></div><input type="range">';
+    row.querySelector("span").textContent = d[1];
+    var inp = row.querySelector("input"), out = row.querySelector("b");
+    inp.min = d[2]; inp.max = d[3]; inp.step = d[4]; inp.setAttribute("aria-label", d[1]);
+    inp.addEventListener("input", function(){ state[d[0]] = +inp.value; out.textContent = (+inp.value).toFixed(d[5]); placeWipe(); });
+    inp.addEventListener("change", writeHash);
+    lineEls[d[0]] = { inp: inp, out: out, dec: d[5] };
+    edgeHost.appendChild(row);
+  });
+})();
 var rb = document.createElement("button");
 rb.className = "btn reset"; rb.type = "button"; rb.textContent = "איפוס לברירת מחדל";
 /* dot colours: mark colour / body colour / custom */
@@ -459,6 +483,8 @@ function syncControls(){
   Object.keys(advInputs).forEach(function(k){
     var a = advInputs[k]; a.inp.value = state.adv[k]; a.out.textContent = (+state.adv[k]).toFixed(a.dec);
   });
+  document.querySelectorAll('input[name="wv"]').forEach(function(el){ el.checked = el.value === state.wv; });
+  Object.keys(lineEls).forEach(function(k){ var e = lineEls[k]; e.inp.value = state[k]; e.out.textContent = (+state[k]).toFixed(e.dec); });
   Object.keys(dotEls).forEach(function(k){
     var e = dotEls[k], v = state[k], custom = v !== "mark" && v !== "body";
     e.sel.value = custom ? "custom" : v; if (custom) e.pick.value = v.length === 7 ? v : e.pick.value;
@@ -500,16 +526,22 @@ function render(){
 function placeWipe(){
   var p = state.wp, invEl = document.getElementById("inv");
   if (!invEl) return;
-  invEl.style.clipPath = "inset(0 " + (100 - p) + "% 0 0)";
+  var r = invEl.getBoundingClientRect(), W = r.width || 1, Hh = r.height || 1;
+  var cx = p / 100 * W, d = Hh / 2 * Math.tan(state.wa * Math.PI / 180);   // top shifts +d, bottom -d (clockwise tilt)
+  invEl.style.clipPath = "polygon(0 0, " + (cx + d) + "px 0, " + (cx - d) + "px " + Hh + "px, 0 " + Hh + "px)";
   invEl.style.webkitClipPath = invEl.style.clipPath;
-  document.getElementById("handle").style.left = p + "%";
-  document.getElementById("grab").style.left = p + "%";
+  ["handle","grab"].forEach(function(id){
+    var el = document.getElementById(id);
+    el.style.left = p + "%"; el.style.transform = "rotate(" + state.wa + "deg)";
+    el.style.display = state.wv === "1" ? "" : "none";
+  });
 }
 function bindWipe(){
   var wipe = document.getElementById("wipe"), grab = document.getElementById("grab"), drag = false;
   function at(e){
     var r = wipe.getBoundingClientRect(), x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
     state.wp = Math.max(0, Math.min(100, x / r.width * 100)); placeWipe();
+    if (lineEls.wp){ lineEls.wp.inp.value = state.wp; lineEls.wp.out.textContent = state.wp.toFixed(1); }
   }
   grab.addEventListener("pointerdown", function(e){ drag = true; grab.setPointerCapture(e.pointerId); e.preventDefault(); });
   grab.addEventListener("pointermove", function(e){ if (drag) at(e); });
@@ -538,7 +570,7 @@ function save(blob, name){
 function settingsJSON(){
   return { app: "clevermetric", version: 1,
     theme: state.t, resolution: state.r, unit: state.u, labels: state.l, length_mm: state.s,
-    logo: state.g === "1", invert_slider_pct: +(+state.wp).toFixed(2),
+    logo: state.g === "1", invert_slider_pct: +(+state.wp).toFixed(2), invert_line_angle_deg: +(+state.wa).toFixed(2), invert_line_visible: state.wv === "1",
     dot_fill: state.df, dot_outline: state.dl,
     advanced: Object.assign({}, state.adv) };
 }
@@ -551,6 +583,8 @@ function applyJSON(j){
   if (isFinite(+j.length_mm)) state.s = Math.max(10, Math.min(300, Math.round(+j.length_mm)));
   if (typeof j.logo === "boolean") state.g = j.logo ? "1" : "0";
   if (isFinite(+j.invert_slider_pct)) state.wp = Math.max(0, Math.min(100, +j.invert_slider_pct));
+  if (isFinite(+j.invert_line_angle_deg)) state.wa = Math.max(-60, Math.min(60, +j.invert_line_angle_deg));
+  if (typeof j.invert_line_visible === "boolean") state.wv = j.invert_line_visible ? "1" : "0";
   if (j.dot_fill && COL_OK.test(j.dot_fill)) state.df = j.dot_fill;
   if (j.dot_outline && COL_OK.test(j.dot_outline)) state.dl = j.dot_outline;
   if (j.advanced) Object.keys(ADV).forEach(function(k){ if (isFinite(+j.advanced[k])) state.adv[k] = +j.advanced[k]; });
