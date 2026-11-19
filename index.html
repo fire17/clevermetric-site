@@ -309,14 +309,13 @@ function build(c, screen){
       '<rect '+BODY_RECT+' filter="url(#grain)" opacity="'+t.grain+'"/><rect '+BODY_RECT+' fill="url(#sheen)"/></g>';
   }
   o.push('<rect x="'+g(bx0)+'" y="'+top+'" width="'+g(tc - bx0)+'" height="'+bh+'" fill="url(#ink)" shape-rendering="crispEdges"/>');
-  var tri = '<g shape-rendering="geometricPrecision">' +
-    paint("body", '<path d="M'+g(tc)+','+g(ta)+' L'+g(tc)+','+g(tb)+' L'+g(tc - side/2)+','+g(tb)+' Z"/>') +
+  // layer order (Tami): dot outline at the bottom, both triangle halves over it, the dot itself on top.
+  // The outline grows outward from the dot, so the dot is never covered at any thickness.
+  var tri = '<g shape-rendering="geometricPrecision">';
+  if (dd > 0 && a.ow > 0) tri += paint(c.dl, '<circle cx="'+g(tc)+'" cy="'+g(dcy)+'" r="'+g(dd/2 + a.ow*S)+'"/>');
+  tri += paint("body", '<path d="M'+g(tc)+','+g(ta)+' L'+g(tc)+','+g(tb)+' L'+g(tc - side/2)+','+g(tb)+' Z"/>') +
     paint("mark", '<path d="M'+g(tc)+','+g(ta)+' L'+g(tc + side/2)+','+g(tb)+' L'+g(tc)+','+g(tb)+' Z"/>');
-  if (dd > 0){
-    // the outline grows outward from the dot, so the dot itself is never covered at any thickness
-    if (a.ow > 0) tri += paint(c.dl, '<circle cx="'+g(tc)+'" cy="'+g(dcy)+'" r="'+g(dd/2 + a.ow*S)+'"/>');
-    tri += paint(c.df, '<circle cx="'+g(tc)+'" cy="'+g(dcy)+'" r="'+g(dd/2)+'"/>');
-  }
+  if (dd > 0) tri += paint(c.df, '<circle cx="'+g(tc)+'" cy="'+g(dcy)+'" r="'+g(dd/2)+'"/>');
   o.push(tri + '</g>');
   o.push('<rect x="'+g(bx0)+'" y="'+top+'" width="'+g(bw)+'" height="2" fill="'+t.hi+'" opacity="'+t.hi_op+'"/>');
   o.push('</g>');
@@ -368,8 +367,8 @@ function hierarchy(c){
 window.__clever = { build: build, hierarchy: hierarchy, ADV: ADV };   // for tests
 
 /* ===== state + URL hash ===== */
-var DEF = { t:"flip", r:1, u:"mm", l:"all", s:10, df:DOT_COL.fill, dl:DOT_COL.line, g:"1", wp:0, wa:0, wv:"1" };
-var state = { t:DEF.t, r:DEF.r, u:DEF.u, l:DEF.l, s:DEF.s, df:DEF.df, dl:DEF.dl, g:DEF.g, wp:DEF.wp, wa:DEF.wa, wv:DEF.wv, adv: Object.assign({}, ADV) };
+var DEF = { t:"flip", r:1, u:"mm", l:"all", s:10, df:DOT_COL.fill, dl:DOT_COL.line, g:"1", wp:0, wa:0, wv:"1", wp2:100, wa2:0 };
+var state = { t:DEF.t, r:DEF.r, u:DEF.u, l:DEF.l, s:DEF.s, df:DEF.df, dl:DEF.dl, g:DEF.g, wp:DEF.wp, wa:DEF.wa, wv:DEF.wv, wp2:DEF.wp2, wa2:DEF.wa2, adv: Object.assign({}, ADV) };
 var COL_OK = /^(light|dark|mark|body|#[0-9a-fA-F]{3,8})$/;
 
 function readHash(){
@@ -386,6 +385,8 @@ function readHash(){
     if (q.wp && isFinite(+q.wp)) state.wp = Math.max(0, Math.min(100, +q.wp));
     if (q.wa && isFinite(+q.wa)) state.wa = Math.max(-60, Math.min(60, +q.wa));
     if (q.wv === "0" || q.wv === "1") state.wv = q.wv;
+    if (q.wp2 && isFinite(+q.wp2)) state.wp2 = Math.max(0, Math.min(100, +q.wp2));
+    if (q.wa2 && isFinite(+q.wa2)) state.wa2 = Math.max(-60, Math.min(60, +q.wa2));
     if (q.s && isFinite(+q.s)) state.s = Math.max(10, Math.min(300, Math.round(+q.s)));
     Object.keys(ADV).forEach(function(k){ if (q[k] != null && isFinite(+q[k])) state.adv[k] = +q[k]; });
     if (q.df && COL_OK.test(q.df)) state.df = q.df;
@@ -399,6 +400,8 @@ function writeHash(){
     if (state.wp) parts.push("wp="+(+state.wp).toFixed(1));
     if (state.wa) parts.push("wa="+(+state.wa).toFixed(1));
     if (state.wv !== DEF.wv) parts.push("wv="+state.wv);
+    if (state.wp2 !== DEF.wp2) parts.push("wp2="+(+state.wp2).toFixed(1));
+    if (state.wa2) parts.push("wa2="+(+state.wa2).toFixed(1));
     Object.keys(ADV).forEach(function(k){ if (state.adv[k] !== ADV[k]) parts.push(k+"="+state.adv[k]); });
     if (state.df !== DEF.df) parts.push("df="+encodeURIComponent(state.df));
     if (state.dl !== DEF.dl) parts.push("dl="+encodeURIComponent(state.dl));
@@ -440,19 +443,20 @@ EDGE_UI.forEach(function(d){ addRow(d, document.getElementById("edgeAdv")); });
 /* orange split line: show/hide, position, angle */
 var lineEls = {}, edgeHost = document.getElementById("edgeAdv");
 (function(){
-  var h = document.createElement("h3"); h.textContent = "הקו הכתום (הפיכת צבעים)"; edgeHost.appendChild(h);
+  var h = document.createElement("h3"); h.textContent = "הקווים הכתומים (הפיכת צבעים: משמאל לקו 1 ומימין לקו 2)"; edgeHost.appendChild(h);
   var seg = document.createElement("div"); seg.className = "seg"; seg.setAttribute("role", "radiogroup");
   seg.innerHTML = '<label><input type="radio" name="wv" value="1"><span>מוצג</span></label><label><input type="radio" name="wv" value="0"><span>מוסתר</span></label>';
   edgeHost.appendChild(seg);
   seg.querySelectorAll("input").forEach(function(el){ el.addEventListener("change", function(){ state.wv = el.value; placeWipe(); writeHash(); }); });
-  [["wp","מיקום הקו (% מאורך הסרגל)",0,100,0.1,1],["wa","זווית הקו (מעלות)",-60,60,0.5,1]].forEach(function(d){
+  [["wp","קו 1: מיקום (% מהרוחב)",0,100,0.1,1],["wa","קו 1: זווית (מעלות)",-60,60,0.5,1],
+   ["wp2","קו 2: מיקום (% מהרוחב)",0,100,0.1,1],["wa2","קו 2: זווית (מעלות)",-60,60,0.5,1]].forEach(function(d){
     var row = document.createElement("div"); row.className = "row";
     row.innerHTML = '<div class="label"><span></span><b></b></div><input type="range">';
     row.querySelector("span").textContent = d[1];
     var inp = row.querySelector("input"), out = row.querySelector("b");
     inp.min = d[2]; inp.max = d[3]; inp.step = d[4]; inp.setAttribute("aria-label", d[1]);
     inp.addEventListener("input", function(){ state[d[0]] = +inp.value; out.textContent = (+inp.value).toFixed(d[5]); placeWipe(); });
-    inp.addEventListener("change", writeHash);
+    inp.addEventListener("change", function(){ lastSvg = ""; schedule(); });
     lineEls[d[0]] = { inp: inp, out: out, dec: d[5] };
     edgeHost.appendChild(row);
   });
@@ -518,15 +522,12 @@ function scale(W){
 function render(){
   pending = false;
   syncControls();
-  var out = build(state, { dark: !!(mq && mq.matches) });
-  var inv = build(Object.assign({}, state, { t: state.t === "flip" ? "invert" : "flip" }), null);
-  var key = out.svg + "|" + inv.svg;
-  if (key !== lastSvg){
-    // ids inside the inverted copy must not collide with the base copy
-    var invSvg = inv.svg.replace(/id="([^"]+)"/g, 'id="inv-$1"').replace(/url\(#([^)]+)\)/g, 'url(#inv-$1)');
-    scroller.innerHTML = '<div class="wipe" id="wipe">' + out.svg + '<div class="inv" id="inv">' + invSvg +
-      '</div><div class="handle" id="handle"></div><div class="grab" id="grab"></div></div>';
-    lastSvg = key; bindWipe();
+  var out = composite(state);
+  if (out.svg !== lastSvg){
+    scroller.innerHTML = '<div class="wipe" id="wipe">' + out.svg +
+      '<div class="handle" id="handle1"></div><div class="grab" id="grab1"></div>' +
+      '<div class="handle" id="handle2"></div><div class="grab" id="grab2"></div></div>';
+    lastSvg = out.svg; bindWipe();
   }
   var k = scale(out.W), wpx = Math.round(out.W * k), hpx = Math.round(H * k);
   document.querySelectorAll("#wipe svg").forEach(function(el){
@@ -540,30 +541,56 @@ function render(){
     m.map(function(x){ return "<li>" + x + "</li>"; }).join("") + "</ul>" : "";
   writeHash();
 }
-/* invert wipe: left of the handle shows the opposite colour scheme */
+/* colour flip, built into the SVG itself so PNG/SVG exports carry it.
+   Two lines: left of line 1 is flipped, between the lines is normal, right of line 2 is flipped again.
+   Each line has its own position (% of the drawing width) and angle. */
+function flipPolys(st, W){
+  var y0 = 70, y1 = 70 + H, half = H / 2;
+  var c1 = st.wp / 100 * W, d1 = half * Math.tan(st.wa * Math.PI / 180);
+  var c2 = st.wp2 / 100 * W, d2 = half * Math.tan(st.wa2 * Math.PI / 180);
+  return [
+    "0,"+y0+" "+(c1 + d1)+","+y0+" "+(c1 - d1)+","+y1+" 0,"+y1,
+    (c2 + d2)+","+y0+" "+W+","+y0+" "+W+","+y1+" "+(c2 - d2)+","+y1
+  ];
+}
+function composite(st){
+  var base = build(st, null);
+  var inv = build(Object.assign({}, st, { t: st.t === "flip" ? "invert" : "flip" }), null);
+  var inner = inv.svg.replace(/^<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "")
+    .replace(/id="([^"]+)"/g, 'id="inv-$1"').replace(/url\(#([^)]+)\)/g, 'url(#inv-$1)');
+  var pp = flipPolys(st, base.W);
+  var layer = '<clipPath id="flipclip"><polygon id="flipA" points="'+pp[0]+'"/><polygon id="flipB" points="'+pp[1]+'"/></clipPath>' +
+    '<g clip-path="url(#flipclip)">' + inner + '</g>';
+  return { svg: base.svg.replace(/<\/svg>\s*$/, layer + '</svg>'), W: base.W };
+}
 function placeWipe(){
-  var p = state.wp, invEl = document.getElementById("inv");
-  if (!invEl) return;
-  var r = invEl.getBoundingClientRect(), W = r.width || 1, Hh = r.height || 1;
-  var cx = p / 100 * W, d = Hh / 2 * Math.tan(state.wa * Math.PI / 180);   // top shifts +d, bottom -d (clockwise tilt)
-  invEl.style.clipPath = "polygon(0 0, " + (cx + d) + "px 0, " + (cx - d) + "px " + Hh + "px, 0 " + Hh + "px)";
-  invEl.style.webkitClipPath = invEl.style.clipPath;
-  ["handle","grab"].forEach(function(id){
-    var el = document.getElementById(id);
-    el.style.left = p + "%"; el.style.transform = "rotate(" + state.wa + "deg)";
-    el.style.display = state.wv === "1" ? "" : "none";
+  var svg = document.querySelector("#wipe svg"); if (!svg) return;
+  var W = +svg.getAttribute("viewBox").split(" ")[2];
+  var pp = flipPolys(state, W);
+  var A = document.getElementById("flipA"), B = document.getElementById("flipB");
+  if (A) A.setAttribute("points", pp[0]);
+  if (B) B.setAttribute("points", pp[1]);
+  [["1", state.wp, state.wa], ["2", state.wp2, state.wa2]].forEach(function(L){
+    ["handle","grab"].forEach(function(id){
+      var el = document.getElementById(id + L[0]); if (!el) return;
+      el.style.left = L[1] + "%"; el.style.transform = "rotate(" + L[2] + "deg)";
+      el.style.display = state.wv === "1" ? "" : "none";
+    });
   });
 }
 function bindWipe(){
-  var wipe = document.getElementById("wipe"), grab = document.getElementById("grab"), drag = false;
-  function at(e){
-    var r = wipe.getBoundingClientRect(), x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
-    state.wp = Math.max(0, Math.min(100, x / r.width * 100)); placeWipe();
-    if (lineEls.wp){ lineEls.wp.inp.value = state.wp; lineEls.wp.out.textContent = state.wp.toFixed(1); }
-  }
-  grab.addEventListener("pointerdown", function(e){ drag = true; grab.setPointerCapture(e.pointerId); e.preventDefault(); });
-  grab.addEventListener("pointermove", function(e){ if (drag) at(e); });
-  grab.addEventListener("pointerup", function(){ drag = false; writeHash(); });
+  var wipe = document.getElementById("wipe");
+  [["1","wp"],["2","wp2"]].forEach(function(L){
+    var grab = document.getElementById("grab" + L[0]), drag = false;
+    grab.addEventListener("pointerdown", function(e){ drag = true; grab.setPointerCapture(e.pointerId); e.preventDefault(); });
+    grab.addEventListener("pointermove", function(e){
+      if (!drag) return;
+      var r = wipe.getBoundingClientRect();
+      state[L[1]] = Math.max(0, Math.min(100, (e.clientX - r.left) / r.width * 100)); placeWipe();
+      var el = lineEls[L[1]]; if (el){ el.inp.value = state[L[1]]; el.out.textContent = state[L[1]].toFixed(1); }
+    });
+    grab.addEventListener("pointerup", function(){ drag = false; lastSvg = ""; schedule(); });
+  });
 }
 function schedule(){
   if (pending) return; pending = true;
@@ -588,7 +615,7 @@ function save(blob, name){
 function settingsJSON(){
   return { app: "clevermetric", version: 1,
     theme: state.t, resolution: state.r, unit: state.u, labels: state.l, length_mm: state.s,
-    logo: state.g === "1", invert_slider_pct: +(+state.wp).toFixed(2), invert_line_angle_deg: +(+state.wa).toFixed(2), invert_line_visible: state.wv === "1",
+    logo: state.g === "1", invert_slider_pct: +(+state.wp).toFixed(2), invert_line_angle_deg: +(+state.wa).toFixed(2), invert_line_visible: state.wv === "1", invert_slider2_pct: +(+state.wp2).toFixed(2), invert_line2_angle_deg: +(+state.wa2).toFixed(2),
     dot_fill: state.df, dot_outline: state.dl,
     advanced: Object.assign({}, state.adv) };
 }
@@ -603,6 +630,8 @@ function applyJSON(j){
   if (isFinite(+j.invert_slider_pct)) state.wp = Math.max(0, Math.min(100, +j.invert_slider_pct));
   if (isFinite(+j.invert_line_angle_deg)) state.wa = Math.max(-60, Math.min(60, +j.invert_line_angle_deg));
   if (typeof j.invert_line_visible === "boolean") state.wv = j.invert_line_visible ? "1" : "0";
+  if (isFinite(+j.invert_slider2_pct)) state.wp2 = Math.max(0, Math.min(100, +j.invert_slider2_pct));
+  if (isFinite(+j.invert_line2_angle_deg)) state.wa2 = Math.max(-60, Math.min(60, +j.invert_line2_angle_deg));
   if (j.dot_fill && COL_OK.test(j.dot_fill)) state.df = j.dot_fill;
   if (j.dot_outline && COL_OK.test(j.dot_outline)) state.dl = j.dot_outline;
   if (j.advanced) Object.keys(ADV).forEach(function(k){ if (isFinite(+j.advanced[k])) state.adv[k] = +j.advanced[k]; });
@@ -621,10 +650,10 @@ ldFile.addEventListener("change", function(){
 });
 window.__clever.settingsJSON = settingsJSON; window.__clever.applyJSON = applyJSON;
 document.getElementById("dlSvg").addEventListener("click", function(){
-  save(new Blob([build(state, null).svg], { type: "image/svg+xml" }), fname("svg"));
+  save(new Blob([composite(state).svg], { type: "image/svg+xml" }), fname("svg"));
 });
 document.getElementById("dlPng").addEventListener("click", function(){
-  var out = build(state, null);
+  var out = composite(state);
   // 2x, clamped to what iOS canvases allow (≤16384 px side, ≤16.7 Mpx)
   var k = Math.min(2, 16384 / out.W, Math.sqrt(16.0e6 / (out.W * H)));
   var img = new Image();
