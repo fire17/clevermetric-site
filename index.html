@@ -353,7 +353,7 @@ function build(c, screen){
   }
   o.push('<text x="'+g(X(span) + ux)+'" y="'+g(edge - leg(span) * S - NUM_GAP)+'" text-anchor="start" font-family="'+FONT+'" font-size="30" fill="'+t.sub+'" letter-spacing="1">'+c.u+'</text>');
   o.push('</svg>');
-  return { svg: o.join("\n"), W: W };
+  return { svg: o.join("\n"), W: W, X0: X0e };
 }
 
 function hierarchy(c){
@@ -372,7 +372,7 @@ function hierarchy(c){
 window.__clever = { build: build, hierarchy: hierarchy, ADV: ADV };   // for tests
 
 /* ===== state + URL hash ===== */
-var DEF = { t:"flip", r:1, u:"mm", l:"all", s:10, df:DOT_COL.fill, dl:DOT_COL.line, g:"1", wp:0, wa:0, wv:"1", wp2:100, wa2:0, dv:"1", d2v:"0", d2f:"light", d2l:"dark" };
+var DEF = { t:"flip", r:1, u:"mm", l:"all", s:10, df:DOT_COL.fill, dl:DOT_COL.line, g:"1", wp:-30, wa:0, wv:"1", wp2:330, wa2:0, dv:"1", d2v:"0", d2f:"light", d2l:"dark" };
 var state = { t:DEF.t, r:DEF.r, u:DEF.u, l:DEF.l, s:DEF.s, df:DEF.df, dl:DEF.dl, g:DEF.g, wp:DEF.wp, wa:DEF.wa, wv:DEF.wv, wp2:DEF.wp2, wa2:DEF.wa2, dv:DEF.dv, d2v:DEF.d2v, d2f:DEF.d2f, d2l:DEF.d2l, adv: Object.assign({}, ADV) };
 var COL_OK = /^(light|dark|mark|body|#[0-9a-fA-F]{3,8})$/;
 
@@ -387,10 +387,10 @@ function readHash(){
     if (q.u === "mm" || q.u === "cm") state.u = q.u;
     if (q.l === "all" || q.l === "key") state.l = q.l;
     if (q.g === "0" || q.g === "1") state.g = q.g;
-    if (q.wp && isFinite(+q.wp)) state.wp = Math.max(0, Math.min(100, +q.wp));
+    if (q.wp && isFinite(+q.wp)) state.wp = Math.max(-30, Math.min(330, +q.wp));
     if (q.wa && isFinite(+q.wa)) state.wa = Math.max(-60, Math.min(60, +q.wa));
     if (q.wv === "0" || q.wv === "1") state.wv = q.wv;
-    if (q.wp2 && isFinite(+q.wp2)) state.wp2 = Math.max(0, Math.min(100, +q.wp2));
+    if (q.wp2 && isFinite(+q.wp2)) state.wp2 = Math.max(-30, Math.min(330, +q.wp2));
     if (q.wa2 && isFinite(+q.wa2)) state.wa2 = Math.max(-60, Math.min(60, +q.wa2));
     if (q.s && isFinite(+q.s)) state.s = Math.max(10, Math.min(300, Math.round(+q.s)));
     Object.keys(ADV).forEach(function(k){ if (q[k] != null && isFinite(+q[k])) state.adv[k] = +q[k]; });
@@ -406,10 +406,10 @@ function writeHash(){
   try {
     var parts = ["t="+state.t, "r="+state.r, "u="+state.u, "l="+state.l, "s="+state.s];
     if (state.g !== DEF.g) parts.push("g="+state.g);
-    if (state.wp) parts.push("wp="+(+state.wp).toFixed(1));
+    if (state.wp !== DEF.wp) parts.push("wp="+(+state.wp).toFixed(2));
     if (state.wa) parts.push("wa="+(+state.wa).toFixed(1));
     if (state.wv !== DEF.wv) parts.push("wv="+state.wv);
-    if (state.wp2 !== DEF.wp2) parts.push("wp2="+(+state.wp2).toFixed(1));
+    if (state.wp2 !== DEF.wp2) parts.push("wp2="+(+state.wp2).toFixed(2));
     if (state.wa2) parts.push("wa2="+(+state.wa2).toFixed(1));
     Object.keys(ADV).forEach(function(k){ if (state.adv[k] !== ADV[k]) parts.push(k+"="+state.adv[k]); });
     if (state.df !== DEF.df) parts.push("df="+encodeURIComponent(state.df));
@@ -459,15 +459,20 @@ var lineEls = {}, edgeHost = document.getElementById("edgeAdv");
   seg.innerHTML = '<label><input type="radio" name="wv" value="1"><span>מוצג</span></label><label><input type="radio" name="wv" value="0"><span>מוסתר</span></label>';
   edgeHost.appendChild(seg);
   seg.querySelectorAll("input").forEach(function(el){ el.addEventListener("change", function(){ state.wv = el.value; placeWipe(); writeHash(); }); });
-  [["wp","קו 1: מיקום (% מהרוחב)",0,100,0.1,1],["wa","קו 1: זווית (מעלות)",-60,60,0.5,1],
-   ["wp2","קו 2: מיקום (% מהרוחב)",0,100,0.1,1],["wa2","קו 2: זווית (מעלות)",-60,60,0.5,1]].forEach(function(d){
+  // positions in mm from 0 (minus = left of 0); every control has -/+ buttons on both sides
+  [["wp","קו 1: מיקום (מ״מ מה־0)",-30,330,0.05,2,0.1],["wa","קו 1: זווית (מעלות)",-60,60,0.5,1,0.5],
+   ["wp2","קו 2: מיקום (מ״מ מה־0)",-30,330,0.05,2,0.1],["wa2","קו 2: זווית (מעלות)",-60,60,0.5,1,0.5]].forEach(function(d){
     var row = document.createElement("div"); row.className = "row";
-    row.innerHTML = '<div class="label"><span></span><b></b></div><input type="range">';
+    row.innerHTML = '<div class="label"><span></span><b></b></div>' +
+      '<div class="len"><button class="step" type="button" aria-label="פחות">−</button><input type="range"><button class="step" type="button" aria-label="יותר">+</button></div>';
     row.querySelector("span").textContent = d[1];
-    var inp = row.querySelector("input"), out = row.querySelector("b");
+    var inp = row.querySelector("input"), out = row.querySelector("b"), bt = row.querySelectorAll("button");
     inp.min = d[2]; inp.max = d[3]; inp.step = d[4]; inp.setAttribute("aria-label", d[1]);
-    inp.addEventListener("input", function(){ state[d[0]] = +inp.value; out.textContent = (+inp.value).toFixed(d[5]); placeWipe(); });
+    function set(v){ state[d[0]] = Math.max(d[2], Math.min(d[3], Math.round(v / d[4]) * d[4])); inp.value = state[d[0]]; out.textContent = (+state[d[0]]).toFixed(d[5]); placeWipe(); }
+    inp.addEventListener("input", function(){ set(+inp.value); });
     inp.addEventListener("change", function(){ lastSvg = ""; schedule(); });
+    bt[0].addEventListener("click", function(){ set(state[d[0]] - d[6]); lastSvg = ""; schedule(); });
+    bt[1].addEventListener("click", function(){ set(state[d[0]] + d[6]); lastSvg = ""; schedule(); });
     lineEls[d[0]] = { inp: inp, out: out, dec: d[5] };
     edgeHost.appendChild(row);
   });
@@ -549,7 +554,7 @@ function render(){
   syncControls();
   var out = composite(state);
   if (out.svg !== lastSvg){
-    scroller.innerHTML = '<div class="wipe" id="wipe">' + out.svg +
+    scroller.innerHTML = '<div class="wipe" id="wipe">' + out.svg.replace("<svg ", '<svg data-x0="'+out.X0+'" ') +
       '<div class="handle" id="handle1"></div><div class="grab" id="grab1"></div>' +
       '<div class="handle" id="handle2"></div><div class="grab" id="grab2"></div></div>';
     lastSvg = out.svg; bindWipe();
@@ -568,11 +573,11 @@ function render(){
 }
 /* colour flip, built into the SVG itself so PNG/SVG exports carry it.
    Two lines: left of line 1 is flipped, between the lines is normal, right of line 2 is flipped again.
-   Each line has its own position (% of the drawing width) and angle. */
-function flipPolys(st, W){
+   Each line has its own position in mm from 0 (negative = left of 0) and its own angle. */
+function flipPolys(st, W, X0){
   var y0 = 70, y1 = 70 + H, half = H / 2;
-  var c1 = st.wp / 100 * W, d1 = half * Math.tan(st.wa * Math.PI / 180);
-  var c2 = st.wp2 / 100 * W, d2 = half * Math.tan(st.wa2 * Math.PI / 180);
+  var c1 = X0 + st.wp * S, d1 = half * Math.tan(st.wa * Math.PI / 180);
+  var c2 = X0 + st.wp2 * S, d2 = half * Math.tan(st.wa2 * Math.PI / 180);
   return [
     "0,"+y0+" "+(c1 + d1)+","+y0+" "+(c1 - d1)+","+y1+" 0,"+y1,
     (c2 + d2)+","+y0+" "+W+","+y0+" "+W+","+y1+" "+(c2 - d2)+","+y1
@@ -583,19 +588,20 @@ function composite(st){
   var inv = build(Object.assign({}, st, { t: st.t === "flip" ? "invert" : "flip" }), null);
   var inner = inv.svg.replace(/^<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "")
     .replace(/id="([^"]+)"/g, 'id="inv-$1"').replace(/url\(#([^)]+)\)/g, 'url(#inv-$1)');
-  var pp = flipPolys(st, base.W);
+  var pp = flipPolys(st, base.W, base.X0);
   var layer = '<clipPath id="flipclip"><polygon id="flipA" points="'+pp[0]+'"/><polygon id="flipB" points="'+pp[1]+'"/></clipPath>' +
     '<g clip-path="url(#flipclip)">' + inner + '</g>';
-  return { svg: base.svg.replace(/<\/svg>\s*$/, layer + '</svg>'), W: base.W };
+  return { svg: base.svg.replace(/<\/svg>\s*$/, layer + '</svg>'), W: base.W, X0: base.X0 };
 }
 function placeWipe(){
   var svg = document.querySelector("#wipe svg"); if (!svg) return;
-  var W = +svg.getAttribute("viewBox").split(" ")[2];
-  var pp = flipPolys(state, W);
+  var W = +svg.getAttribute("viewBox").split(" ")[2], X0 = +svg.getAttribute("data-x0");
+  var pp = flipPolys(state, W, X0);
+  function pct(mm){ return (X0 + mm * S) / W * 100; }
   var A = document.getElementById("flipA"), B = document.getElementById("flipB");
   if (A) A.setAttribute("points", pp[0]);
   if (B) B.setAttribute("points", pp[1]);
-  [["1", state.wp, state.wa], ["2", state.wp2, state.wa2]].forEach(function(L){
+  [["1", pct(state.wp), state.wa], ["2", pct(state.wp2), state.wa2]].forEach(function(L){
     ["handle","grab"].forEach(function(id){
       var el = document.getElementById(id + L[0]); if (!el) return;
       el.style.left = L[1] + "%"; el.style.transform = "rotate(" + L[2] + "deg)";
@@ -610,9 +616,11 @@ function bindWipe(){
     grab.addEventListener("pointerdown", function(e){ drag = true; grab.setPointerCapture(e.pointerId); e.preventDefault(); });
     grab.addEventListener("pointermove", function(e){
       if (!drag) return;
-      var r = wipe.getBoundingClientRect();
-      state[L[1]] = Math.max(0, Math.min(100, (e.clientX - r.left) / r.width * 100)); placeWipe();
-      var el = lineEls[L[1]]; if (el){ el.inp.value = state[L[1]]; el.out.textContent = state[L[1]].toFixed(1); }
+      var r = wipe.getBoundingClientRect(), svg = wipe.querySelector("svg");
+      var W = +svg.getAttribute("viewBox").split(" ")[2], X0 = +svg.getAttribute("data-x0");
+      var px = (e.clientX - r.left) / r.width * W;                       // drawing units
+      state[L[1]] = Math.max(-30, Math.min(330, Math.round((px - X0) / S / 0.05) * 0.05)); placeWipe();
+      var el = lineEls[L[1]]; if (el){ el.inp.value = state[L[1]]; el.out.textContent = state[L[1]].toFixed(2); }
     });
     grab.addEventListener("pointerup", function(){ drag = false; lastSvg = ""; schedule(); });
   });
@@ -640,7 +648,7 @@ function save(blob, name){
 function settingsJSON(){
   return { app: "clevermetric", version: 1,
     theme: state.t, resolution: state.r, unit: state.u, labels: state.l, length_mm: state.s,
-    logo: state.g === "1", invert_slider_pct: +(+state.wp).toFixed(2), invert_line_angle_deg: +(+state.wa).toFixed(2), invert_line_visible: state.wv === "1", invert_slider2_pct: +(+state.wp2).toFixed(2), invert_line2_angle_deg: +(+state.wa2).toFixed(2),
+    logo: state.g === "1", invert_line1_mm: +(+state.wp).toFixed(3), invert_line_angle_deg: +(+state.wa).toFixed(2), invert_line_visible: state.wv === "1", invert_line2_mm: +(+state.wp2).toFixed(3), invert_line2_angle_deg: +(+state.wa2).toFixed(2),
     dot_fill: state.df, dot_outline: state.dl, dot_visible: state.dv === "1",
     dot2_visible: state.d2v === "1", dot2_fill: state.d2f, dot2_outline: state.d2l,
     advanced: Object.assign({}, state.adv) };
@@ -653,10 +661,10 @@ function applyJSON(j){
   if (j.labels === "all" || j.labels === "key") state.l = j.labels;
   if (isFinite(+j.length_mm)) state.s = Math.max(10, Math.min(300, Math.round(+j.length_mm)));
   if (typeof j.logo === "boolean") state.g = j.logo ? "1" : "0";
-  if (isFinite(+j.invert_slider_pct)) state.wp = Math.max(0, Math.min(100, +j.invert_slider_pct));
+  if (isFinite(+j.invert_line1_mm)) state.wp = Math.max(-30, Math.min(330, +j.invert_line1_mm));
   if (isFinite(+j.invert_line_angle_deg)) state.wa = Math.max(-60, Math.min(60, +j.invert_line_angle_deg));
   if (typeof j.invert_line_visible === "boolean") state.wv = j.invert_line_visible ? "1" : "0";
-  if (isFinite(+j.invert_slider2_pct)) state.wp2 = Math.max(0, Math.min(100, +j.invert_slider2_pct));
+  if (isFinite(+j.invert_line2_mm)) state.wp2 = Math.max(-30, Math.min(330, +j.invert_line2_mm));
   if (isFinite(+j.invert_line2_angle_deg)) state.wa2 = Math.max(-60, Math.min(60, +j.invert_line2_angle_deg));
   if (j.dot_fill && COL_OK.test(j.dot_fill)) state.df = j.dot_fill;
   if (j.dot_outline && COL_OK.test(j.dot_outline)) state.dl = j.dot_outline;
