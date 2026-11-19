@@ -252,12 +252,16 @@ function build(c, screen){
   o.push('<g fill="url(#ink)" shape-rendering="crispEdges">');
   for (var p = -res; p < br; p += 2 * res) o.push('<path d="'+band(p)+'"/>');
   o.push('</g>');
-  // split triangle: black half | white half, the split line is the reading edge
-  var tc = X(-1.3 - EXT / 2), th = 1.9 * S, tw = 1.7 * S, tb = edge - 0.9 * S, ta = tb - th;
+  // edge sign: a vertical split through the extension. Left of it the background is the
+  // mark colour, right of it the ruler body; each triangle half takes the opposite colour,
+  // so the black/blank switch reads both inside and outside the triangle.
+  var tc = X(-1.3 - EXT / 2), side = 1.15 * S, th = side * Math.sqrt(3) / 2;
+  var tmid = (top + edge) / 2, ta = tmid - th / 2, tb = tmid + th / 2;
+  var bodySolid = t.body[2][1];
+  o.push('<rect x="'+g(bx0)+'" y="'+top+'" width="'+g(tc - bx0)+'" height="'+bh+'" fill="url(#ink)" shape-rendering="crispEdges"/>');
   o.push('<g shape-rendering="geometricPrecision">' +
-    '<path d="M'+g(tc)+','+g(ta)+' L'+g(tc)+','+g(tb)+' L'+g(tc - tw/2)+','+g(tb)+' Z" fill="#141516"/>' +
-    '<path d="M'+g(tc)+','+g(ta)+' L'+g(tc + tw/2)+','+g(tb)+' L'+g(tc)+','+g(tb)+' Z" fill="#f7f8f9"/>' +
-    '<path d="M'+g(tc)+','+g(ta)+' L'+g(tc + tw/2)+','+g(tb)+' L'+g(tc - tw/2)+','+g(tb)+' Z" fill="none" stroke="#7d828a" stroke-width="2" stroke-linejoin="round"/>' +
+    '<path d="M'+g(tc)+','+g(ta)+' L'+g(tc)+','+g(tb)+' L'+g(tc - side/2)+','+g(tb)+' Z" fill="'+bodySolid+'"/>' +
+    '<path d="M'+g(tc)+','+g(ta)+' L'+g(tc + side/2)+','+g(tb)+' L'+g(tc)+','+g(tb)+' Z" fill="'+t.ink+'"/>' +
     '</g>');
   o.push('<rect x="'+g(bx0)+'" y="'+top+'" width="'+g(bw)+'" height="2" fill="'+t.hi+'" opacity="'+t.hi_op+'"/>');
   o.push('</g>');
