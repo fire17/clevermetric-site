@@ -260,13 +260,26 @@ footer{overflow-wrap:anywhere;color:var(--muted);font-size:12.5px;margin:22px 2p
       </div>
     </div>
     <div class="card">
-      <div class="label">Resolution</div>
+      <div class="label">Unit system</div>
       <div class="seg" role="radiogroup">
-        <label><input type="radio" name="r" value="1"><span>Every mm</span></label>
-        <label><input type="radio" name="r" value="0.5"><span>Every ½ mm</span></label>
+        <label><input type="radio" name="us" value="metric"><span>Metric</span></label>
+        <label><input type="radio" name="us" value="inch"><span>Inch</span></label>
       </div>
     </div>
     <div class="card">
+      <div class="label">Resolution</div>
+      <div class="seg" role="radiogroup" id="rSeg">
+        <label><input type="radio" name="r" value="1"><span>Every mm</span></label>
+        <label><input type="radio" name="r" value="0.5"><span>Every ½ mm</span></label>
+      </div>
+      <div class="seg" role="radiogroup" id="ipSeg" style="display:none">
+        <label><input type="radio" name="ip" value="8"><span>1/8</span></label>
+        <label><input type="radio" name="ip" value="16"><span>1/16</span></label>
+        <label><input type="radio" name="ip" value="32"><span>1/32</span></label>
+        <label><input type="radio" name="ip" value="10"><span>1/10</span></label>
+      </div>
+    </div>
+    <div class="card" id="uCard">
       <div class="label">Units</div>
       <div class="seg" role="radiogroup">
         <label><input type="radio" name="u" value="mm"><span>mm</span></label>
@@ -277,7 +290,7 @@ footer{overflow-wrap:anywhere;color:var(--muted);font-size:12.5px;margin:22px 2p
       <div class="label">Numbers</div>
       <div class="seg" role="radiogroup">
         <label><input type="radio" name="l" value="all"><span>All</span></label>
-        <label><input type="radio" name="l" value="key"><span>Only 0·5·10</span></label>
+        <label><input type="radio" name="l" value="key"><span id="keyLbl">Only 0·5·10</span></label>
       </div>
     </div>
     <div class="card">
@@ -347,6 +360,27 @@ var LOGO_DARK = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAegAAAB0CAYAAABOg
 var LOGO_LIGHT = "data:image/png;base64,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";
 var DOT_COL = { fill:"light", line:"dark" };   // dot colours: light | dark (the ruler's two sides, per theme) | mark | body | any #hex
 
+/* inch mode (US customary), same look as the approved inch/make_inch.py: ranks inch > 1/2 > 1/4 > 1/8 > 1/16 > 1/32
+   (decimal: inch > 1/2 > 1/10); every mark is labelled; bands sit on [odd, even] divisions */
+var IN_MM = 25.4;
+var INCH = {
+  LEG: { "in":2.55, "1/2":2.05, "1/4":1.58, "1/8":1.22, "1/10":1.22, "1/16":0.88, "1/32":0.62 },
+  NUM: { "in":82, "1/2":46, "1/4":38, "1/8":32, "1/10":30, "1/16":25, "1/32":20 },
+  LOGO: [2.2, 5.75], WORD: [7.0, 10.5]   // mm from 0: the reference's logo + wordmark band
+};
+function gcd(a, b){ while (b){ var t_ = a % b; a = b; b = t_; } return a; }
+function iRank(k, n){   // k = division index from 0, n = divisions per inch (8|16|32|10)
+  if (k < 0) return n === 10 ? "1/10" : "1/32";   // the leg left of 0 (as the reference)
+  if (k % n === 0) return "in";
+  if (n === 10) return (2 * k) % n === 0 ? "1/2" : "1/10";
+  return "1/" + (n / gcd(k % n, n));
+}
+function iLabel(k, n){
+  if (k % n === 0) return String(k / n);
+  if (n === 10) return "." + (k % n);
+  var c_ = gcd(k % n, n), f = ((k % n) / c_) + "/" + (n / c_);
+  return { "1/2":"½", "1/4":"¼", "3/4":"¾", "1/8":"⅛", "3/8":"⅜", "5/8":"⅝", "7/8":"⅞" }[f] || f;
+}
 function g(x){ return String(+(+x).toFixed(3)); }   // python's :g for our ranges
 function rank(k){ return k===0?"0":k===5?"5":(k===3||k===8)?"3":(k===2||k===7)?"2":"1"; }
 function mod10(n){ return ((n%10)+10)%10; }
@@ -354,7 +388,11 @@ function fmt(n, unit){ return unit==="mm" ? String(n) : String(+(n/10).toFixed(2
 
 /* ===== per-mark overrides (editor): sparse {"<mm>":{h,w,z}} + compact hash codec ===== */
 var OV_F = { h:[0.05,3.3], w:[0.01,0.49], z:[12,160] };      // leg height mm, leg width mm, numeral size
-function okey(m){ return String(Math.round(m * 2) / 2); }      // 5 -> "5", 12.5 -> "12.5", -1 -> "-1"
+function okey(m){                                              // 5 -> "5", 12.5 -> "12.5", -1 -> "-1"
+  // inch mode: snap to the precision's division first, so a key is the mark's exact mm (4 decimals) and stable
+  if (typeof state !== "undefined" && state && state.us === "inch"){ var ip_ = +state.ip || 16, d_ = Math.round(m * ip_ / 25.4); return String(+(d_ * 25.4 / ip_).toFixed(4)); }
+  return String(Math.round(m * 2) / 2);
+}
 function nnum(v){ return String(+(+v).toFixed(3)).replace(/^(-?)0\./, "$1."); }
 function snap(v, step){ return +(Math.round(v / step) * step).toFixed(3); }
 function ovSet(ovs, m, f, v, dflt){
@@ -377,7 +415,7 @@ function ovEncode(ovs){                       // {"5":{h:2.1},"15":{h:2.1}} -> "
 function ovDecode(str){
   var ovs = {};
   String(str || "").split("_").forEach(function(ent){
-    var mm = /^(-?\d+(?:\.5)?(?:~-?\d+(?:\.5)?)*)((?:[hwz]-?(?:\d+\.?\d*|\.\d+))+)$/.exec(ent);
+    var mm = /^(-?\d+(?:\.\d+)?(?:~-?\d+(?:\.\d+)?)*)((?:[hwz]-?(?:\d+\.?\d*|\.\d+))+)$/.exec(ent);
     if (!mm) return;
     var fields = {}, re = /([hwz])(-?(?:\d+\.?\d*|\.\d+))/g, f;
     while ((f = re.exec(mm[2]))){
@@ -385,30 +423,33 @@ function ovDecode(str){
       if (isFinite(v)) fields[f[1]] = Math.max(lim[0], Math.min(lim[1], v));
     }
     mm[1].split("~").forEach(function(k){
-      if (+k >= -3 && +k <= 301){ var key = okey(+k); ovs[key] = Object.assign(ovs[key] || {}, fields); }
+      var inch_ = typeof state !== "undefined" && state && state.us === "inch";   // metric keeps its old -3..301 range
+      if (inch_ ? (+k >= -8 && +k <= 310) : (+k >= -3 && +k <= 301)){ var key = okey(+k); ovs[key] = Object.assign(ovs[key] || {}, fields); }
     });
   });
   return ovs;
 }
 
 function build(c, screen){
-  var t = THEMES[c.t], a = c.adv, res = c.r, span = c.s;
+  var t = THEMES[c.t], a = c.adv, IN = c.us === "inch", ip = +c.ip || 16;
+  var res = IN ? IN_MM / ip : c.r, span = IN ? c.s * IN_MM : c.s;
   var leg = function(m){
+    if (IN) return INCH.LEG[iRank(Math.round(m / res), ip)];
     if (Math.abs(m - Math.round(m)) > 1e-9) return a.gh;
     return a["g"+rank(mod10(Math.round(m)))];
   };
-  var numSize = function(k){ return a["n"+rank(k)]; };
+  var numSize = function(k){ return IN ? INCH.NUM[iRank(Math.round(k / res), ip)] : a["n"+rank(k)]; };   // inch: k = mm from 0
   var OV = c.ov || {};
   var ov = function(m){ return OV[okey(m)]; };
   var legH = function(m){ var o = ov(m); return o && o.h != null ? o.h : leg(m); };
-  var nSize = function(n){ var o = ov(n); return o && o.z != null ? o.z : numSize(mod10(n)); };
+  var nSize = function(n){ var o = ov(n); return o && o.z != null ? o.z : numSize(IN ? n : mod10(n)); };
   // EXT: body extension left of 0 holding the split-triangle "the mark is the edge" sign
   // the body grows left with the edge sign so it never clips (default tx=-2, ts=1 keeps EXT at 2.0)
   // left end of the body = triangle's left corner minus the end margin em (defaults keep EXT at 2.0)
   var EXT = Math.max(0, -c.adv.tx + c.adv.ts / 2 + c.adv.em - 1.3), X0e = X0 + EXT * S;
-  var W = Math.floor(X0e + (span + 2.0) * S);
+  var W = Math.floor(X0e + (span + (IN ? 3.6 : 2.0)) * S);   // inch: room for the longer "in · 1/16" tag
   var X = function(mm){ return X0e + mm * S; };
-  var bl = -1.3 - EXT, br = span + 1.6, edge = EDGE_Y, top = BODY_TOP;
+  var bl = -1.3 - EXT, br = span + (IN ? 3.2 : 1.6), edge = EDGE_Y, top = BODY_TOP;
   var bx0 = X(bl), bx1 = X(br), bw = bx1 - bx0, bh = edge - top;
   var w = a.w * S, yk = edge - a.b * S;
   var legW = function(m){ var o = ov(m); return o && o.w != null ? Math.min(o.w, res * 0.49) * S : w; };
@@ -469,7 +510,8 @@ function build(c, screen){
   }
   o.push(SW ? '<rect '+BR+' fill="url(#ink)"/>' : metal());
   var bandPaths = '';
-  for (var p = -res; p < br; p += 2 * res) bandPaths += '<path d="'+band(p)+'"/>';
+  if (IN) for (var bk = -1; bk * IN_MM / ip < br; bk += 2) bandPaths += '<path d="'+band(bk * IN_MM / ip)+'"/>';   // exact multiples of 25.4/n
+  else for (var p = -res; p < br; p += 2 * res) bandPaths += '<path d="'+band(p)+'"/>';
   if (SW) o.push('<clipPath id="bandclip">'+bandPaths+'</clipPath>' + metal('bandclip'));
   else o.push('<g fill="url(#ink)" shape-rendering="crispEdges">'+bandPaths+'</g>');
   // edge sign: a vertical split through the extension. Left of it the background is the
@@ -519,39 +561,43 @@ function build(c, screen){
   o.push(tri + '</g>');
   o.push('<rect x="'+g(bx0)+'" y="'+top+'" width="'+g(bw)+'" height="2" fill="'+t.hi+'" opacity="'+t.hi_op+'"/>');
   o.push('</g>');
+  var LG = IN ? INCH.LOGO : [1, 4.55], WD = IN ? INCH.WORD : [5.5, 9];   // inch: the approved reference's band
   if (c.g === "1" && span >= 5){
-    var lw = X(4.55) - X(1), lh = lw * 116 / 488;   // stays clear of the 5 numeral
-    var limg = 'x="'+g(X(1))+'" y="'+g(top + 20)+'" width="'+g(lw)+'" height="'+g(lh)+'"';
+    var lw = X(LG[1]) - X(LG[0]), lh = lw * 116 / 488;   // stays clear of the 5 numeral
+    var limg = 'x="'+g(X(LG[0]))+'" y="'+g(top + 20)+'" width="'+g(lw)+'" height="'+g(lh)+'"';
     if (SW) o.push('<mask id="logomask" maskUnits="userSpaceOnUse" '+BR+'><image href="'+LOGO_LIGHT+'" '+limg+'/></mask><g mask="url(#logomask)">'+metal()+'</g>');
     else o.push('<image href="'+(c.t === "invert" ? LOGO_LIGHT : LOGO_DARK)+'" '+limg+'/>');
   }
   if (c.g === "1" && span >= 9){
     // "Clevemetric" wordmark (no r), styled to sit with the FastCap mark: heavy italic sans, same ink and band
     // baseline = the FastCap letters' baseline (row 104 of the 116-row logo mask; only the p descender goes lower)
-    var wx0 = X(5.5), wx1 = X(9), wcap = (X(4.55) - X(1)) * 116 / 488;
+    var wx0 = X(WD[0]), wx1 = X(WD[1]), wcap = (X(LG[1]) - X(LG[0])) * 116 / 488;
     txt('<text x="'+g((wx0 + wx1) / 2)+'" y="'+g(top + 20 + wcap * 104 / 116)+'" text-anchor="middle" textLength="'+g(wx1 - wx0)+'" lengthAdjust="spacingAndGlyphs" ' +
       'font-family="\'Arial Black\', \'Helvetica Neue\', Arial, sans-serif" font-weight="900" font-style="italic" font-size="'+g(wcap * 0.62)+'" fill="'+t.num+'">Clevemetric</text>');
   }
-  var lastShown = false;
-  for (var n = 0; n <= span; n++){
-    var k = n % 10;
-    if (c.l === "key" && k !== 0 && k !== 5) continue;
-    var col = (k === 0 || k === 5) ? t.num : t.sub;
-    var base = edge - legH(n) * S - NUM_GAP;
-    txt('<text x="'+g(X(n))+'" y="'+g(base)+'" text-anchor="middle" font-family="'+FONT+'" font-size="'+nSize(n)+'" font-weight="700" fill="'+col+'">'+fmt(n, c.u)+'</text>');
-    geo.nums.push({ n:n, x:X(n), base:base, size:nSize(n), text:fmt(n, c.u) });
-    if (n === span) lastShown = true;
+  // numerals. metric: one per mm; inch (Tami 16:18): every division labelled, whole inches big, the rest as the
+  // reduced fraction of the inch (¼ ⅜ 5/16 7/32 ...) or .1-.9 on the decimal ruler, sized by rank
+  var lastShown = false, NN = IN ? Math.round(c.s * ip) : span;
+  for (var ni = 0; ni <= NN; ni++){
+    var n = IN ? ni * IN_MM / ip : ni, k = IN ? iRank(ni, ip) : n % 10;
+    if (IN ? (c.l === "key" && k !== "in" && k !== "1/2") : (c.l === "key" && k !== 0 && k !== 5)) continue;
+    var col = (IN ? k === "in" : (k === 0 || k === 5)) ? t.num : t.sub;
+    var base = edge - legH(n) * S - NUM_GAP, lbl = IN ? iLabel(ni, ip) : fmt(n, c.u);
+    txt('<text x="'+g(X(n))+'" y="'+g(base)+'" text-anchor="middle" font-family="'+FONT+'" font-size="'+nSize(n)+'" font-weight="700" fill="'+col+'">'+lbl+'</text>');
+    geo.nums.push({ n:n, x:X(n), base:base, size:nSize(n), text:lbl });
+    if (ni === NN) lastShown = true;
   }
   // unit tag: ruler.py's offset, pushed right only when a wide last numeral would collide
-  var ux = 0.6 * S + ((c.u === "cm" && fmt(span, c.u).length === 1) ? 0.25 * S : 0);
+  var UT = IN ? "in · 1/" + ip : c.u;
+  var ux = 0.6 * S + ((!IN && c.u === "cm" && fmt(span, c.u).length === 1) ? 0.25 * S : 0);
   if (lastShown){
-    var s = fmt(span, c.u), digits = s.replace(/\./g,"").length, dots = s.length - digits;
+    var s = IN ? String(c.s) : fmt(span, c.u), digits = s.replace(/\./g,"").length, dots = s.length - digits;
     var half = (digits * 0.55 + dots * 0.28) * nSize(span) / 2;
     ux = Math.max(ux, half + 14);
   }
-  var ulx = X(span) + ux, ulw = c.u.length * 0.62 * 30 + 4, ulTop = legH(span);
+  var ulx = X(span) + ux, ulw = UT.length * 0.62 * 30 + 4, ulTop = legH(span);
   for (var um = span + res; X(um) <= ulx + ulw + 2 && um <= br; um += res) ulTop = Math.max(ulTop, legH(um));
-  txt('<text x="'+g(ulx)+'" y="'+g(edge - ulTop * S - NUM_GAP)+'" text-anchor="start" font-family="'+FONT+'" font-size="30" fill="'+t.sub+'" letter-spacing="1">'+c.u+'</text>');
+  txt('<text x="'+g(ulx)+'" y="'+g(edge - ulTop * S - NUM_GAP)+'" text-anchor="start" font-family="'+FONT+'" font-size="30" fill="'+t.sub+'" letter-spacing="1">'+UT+'</text>');
   if (SW && TX.length) o.push('<clipPath id="textclip">'+TX.join("")+'</clipPath>' + metal('textclip'));
   o.push('</svg>');
   return { svg: o.join("\n"), W: W, X0: X0e, geo: geo };
@@ -565,19 +611,30 @@ function hierarchy(c){
   var N = [["n0","0/10"],["n5","5"],["n3","3/8"],["n2","2/7"],["n1","1/4/6/9"]];
   for (var j = 0; j < N.length - 1; j++)
     if (!(a[N[j][0]] > a[N[j+1][0]])) msgs.push("Numeral size: " + N[j][1] + " should be larger than " + N[j+1][1]);
-  var minLeg = c.r === 0.5 ? a.gh : a.g1;
+  var IN = c.us === "inch", ipn = +c.ip || 16;
+  if (IN) msgs = [];   // inch leg/numeral ranks are fixed (Tami's approved set); only block depth and leg width apply
+  var minLeg = IN ? Math.min(INCH.LEG[iRank(1, ipn)], INCH.LEG[iRank(-1, ipn)]) : c.r === 0.5 ? a.gh : a.g1;
   if (!(a.b < minLeg)) msgs.push("Block depth is larger than the shortest leg — legs get swallowed");
-  if (!(2 * a.w < c.r)) msgs.push("Leg width is too large for the band width");
+  if (!(2 * a.w < (IN ? IN_MM / ipn : c.r))) msgs.push("Leg width is too large for the band width");
   return msgs;
 }
-window.__clever = { build: build, hierarchy: hierarchy, ADV: ADV };   // for tests
+window.__clever = { build: build, hierarchy: hierarchy, ADV: ADV, iRank: iRank, iLabel: iLabel, INCH: INCH };   // for tests
 
 /* ===== state + URL hash ===== */
-var DEF = { t:"flip", r:1, u:"mm", l:"all", s:10, df:DOT_COL.fill, dl:DOT_COL.line, g:"1", wp:-2, wa:0, wv:"1", wp2:330, wa2:0, dv:"1", d2v:"0", d2f:"light", d2l:"dark" };
-var state = { t:DEF.t, r:DEF.r, u:DEF.u, l:DEF.l, s:DEF.s, df:DEF.df, dl:DEF.dl, g:DEF.g, wp:DEF.wp, wa:DEF.wa, wv:DEF.wv, wp2:DEF.wp2, wa2:DEF.wa2, dv:DEF.dv, d2v:DEF.d2v, d2f:DEF.d2f, d2l:DEF.d2l, adv: Object.assign({}, ADV) };
+var DEF = { t:"flip", r:1, u:"mm", l:"all", s:10, df:DOT_COL.fill, dl:DOT_COL.line, g:"1", wp:-2, wa:0, wv:"1", wp2:330, wa2:0, dv:"1", d2v:"0", d2f:"light", d2l:"dark", us:"metric", ip:16 };
+var state = { t:DEF.t, r:DEF.r, u:DEF.u, l:DEF.l, s:DEF.s, df:DEF.df, dl:DEF.dl, g:DEF.g, wp:DEF.wp, wa:DEF.wa, wv:DEF.wv, wp2:DEF.wp2, wa2:DEF.wa2, dv:DEF.dv, d2v:DEF.d2v, d2f:DEF.d2f, d2l:DEF.d2l, us:DEF.us, ip:DEF.ip, adv: Object.assign({}, ADV) };
 state.ov = {};
 var COL_OK = /^(light|dark|mark|body|#[0-9a-fA-F]{3,8})$/;
 function resDefaults(r){ return r === 0.5 ? { tx: -2, wp: -1 } : { tx: -3, wp: -2 }; }   // Tami's spacing per resolution
+// inch: the same rule in the inch's own divisions — mirror line 2 divisions left of 0, triangle centre 1 mm further
+// (the left end is 1 mm further again through the default triangle side + end margin)
+function inchDefaults(ip){ var d = IN_MM / ip; return { tx: +(-2 * d - 1).toFixed(6), wp: +(-2 * d).toFixed(6) }; }
+function sysDefaults(st){ return st.us === "inch" ? inchDefaults(st.ip) : resDefaults(st.r); }
+var LEN = { metric:[10, 300, 10], inch:[1, 12, 3] };   // length range + default per unit system (mm | inches)
+function lenOf(st){ var L = LEN[st.us] || LEN.metric; return L; }
+function lineF(){ return state.us === "inch" ? IN_MM : 0; }   // flip lines show in inches in inch mode (stored in mm)
+function lineSnap(mm){ return state.us === "inch" ? Math.round(mm / IN_MM * 1000) / 1000 * IN_MM : Math.round(mm / 0.05) * 0.05; }   // metric 0.05 mm, inch 0.001 in
+function lineFmt(v){ return state.us === "inch" ? String(+(+v).toFixed(5)) : (+v).toFixed(2); }
 
 function readHash(hs){
   try {
@@ -587,7 +644,9 @@ function readHash(hs){
     h.split("&").forEach(function(kv){ var i = kv.indexOf("="); if (i > 0) q[decodeURIComponent(kv.slice(0,i))] = decodeURIComponent(kv.slice(i+1)); });
     if (q.t === "flip" || q.t === "invert") state.t = q.t;
     if (q.r === "1" || q.r === "0.5") state.r = +q.r;
-    var rd = resDefaults(state.r); if (q.tx == null) state.adv.tx = rd.tx; if (q.wp == null) state.wp = rd.wp;   // a link without tx/wp gets its resolution's defaults
+    state.us = q.us === "inch" ? "inch" : "metric";   // links without us= are metric (every link before inch mode)
+    state.ip = (q.ip === "8" || q.ip === "16" || q.ip === "32" || q.ip === "10") ? +q.ip : DEF.ip;
+    var rd = sysDefaults(state); if (q.tx == null) state.adv.tx = rd.tx; if (q.wp == null) state.wp = rd.wp;   // a link without tx/wp gets its resolution's defaults
     if (q.u === "mm" || q.u === "cm") state.u = q.u;
     if (q.l === "all" || q.l === "key") state.l = q.l;
     if (q.g === "0" || q.g === "1") state.g = q.g;
@@ -596,7 +655,9 @@ function readHash(hs){
     if (q.wv === "0" || q.wv === "1") state.wv = q.wv;
     if (q.wp2 && isFinite(+q.wp2)) state.wp2 = Math.max(-30, Math.min(330, +q.wp2));
     if (q.wa2 && isFinite(+q.wa2)) state.wa2 = Math.max(-60, Math.min(60, +q.wa2));
-    if (q.s && isFinite(+q.s)) state.s = Math.max(10, Math.min(300, Math.round(+q.s)));
+    if (q.s && isFinite(+q.s)) state.s = Math.max(lenOf(state)[0], Math.min(lenOf(state)[1], Math.round(+q.s)));
+    else if (state.us === "inch") state.s = LEN.inch[2];
+    else state.s = Math.max(lenOf(state)[0], Math.min(lenOf(state)[1], state.s));
     Object.keys(ADV).forEach(function(k){ if (q[k] != null && isFinite(+q[k])) state.adv[k] = +q[k]; });
     if (q.df && COL_OK.test(q.df)) state.df = q.df;
     if (q.dl && COL_OK.test(q.dl)) state.dl = q.dl;
@@ -610,13 +671,17 @@ function readHash(hs){
 function writeHash(){
   try {
     var parts = ["t="+state.t, "r="+state.r, "u="+state.u, "l="+state.l, "s="+state.s];
+    var INH = state.us === "inch";   // inch: s is in inches, line positions stay in mm (finer: divisions are 25.4/n)
+    if (INH) parts.push("us=inch", "ip="+state.ip);
     if (state.g !== DEF.g) parts.push("g="+state.g);
-    if (state.wp !== DEF.wp) parts.push("wp="+(+state.wp).toFixed(2));
+    if (INH ? Math.abs(state.wp - sysDefaults(state).wp) > 1e-9 : state.wp !== DEF.wp) parts.push("wp="+(INH ? lineFmt(state.wp) : (+state.wp).toFixed(2)));
     if (state.wa) parts.push("wa="+(+state.wa).toFixed(1));
     if (state.wv !== DEF.wv) parts.push("wv="+state.wv);
-    if (state.wp2 !== DEF.wp2) parts.push("wp2="+(+state.wp2).toFixed(2));
+    if (state.wp2 !== DEF.wp2) parts.push("wp2="+(INH ? lineFmt(state.wp2) : (+state.wp2).toFixed(2)));
     if (state.wa2) parts.push("wa2="+(+state.wa2).toFixed(1));
-    Object.keys(ADV).forEach(function(k){ if (state.adv[k] !== ADV[k]) parts.push(k+"="+state.adv[k]); });
+    Object.keys(ADV).forEach(function(k){
+      if (INH && k === "tx" ? Math.abs(state.adv.tx - sysDefaults(state).tx) > 1e-9 : state.adv[k] !== ADV[k]) parts.push(k+"="+state.adv[k]);
+    });
     if (state.df !== DEF.df) parts.push("df="+encodeURIComponent(state.df));
     if (state.dl !== DEF.dl) parts.push("dl="+encodeURIComponent(state.dl));
     ["dv","d2v"].forEach(function(k){ if (state[k] !== DEF[k]) parts.push(k+"="+state[k]); });
@@ -660,6 +725,19 @@ ADV_UI.forEach(function(d){ addRow(d, advEl); });
 EDGE_UI.forEach(function(d){ addRow(d, document.getElementById("edgeAdv")); });
 /* orange split line: show/hide, position, angle */
 var lineEls = {}, edgeHost = document.getElementById("edgeAdv");
+function lineSync(k){   // one line control: range + readout in the unit system's own measure
+  var e = lineEls[k]; if (!e) return;
+  var pos = k === "wp" || k === "wp2", f = pos ? lineF() : 0;
+  if (f){
+    e.inp.min = -1.18; e.inp.max = 12.99; e.inp.step = 0.001;
+    e.inp.value = state[k] / f; e.out.textContent = (state[k] / f).toFixed(4);
+    e.lbl.textContent = e.txt.replace("mm from 0", "in from 0");
+  } else {
+    e.inp.min = e.d[2]; e.inp.max = e.d[3]; e.inp.step = e.d[4];
+    e.inp.value = state[k]; e.out.textContent = (+state[k]).toFixed(e.dec);
+    e.lbl.textContent = e.txt;
+  }
+}
 (function(){
   var h = document.createElement("h3"); h.textContent = "Orange lines (material flip: left of line 1 and right of line 2)"; edgeHost.appendChild(h);
   var seg = document.createElement("div"); seg.className = "seg"; seg.setAttribute("role", "radiogroup");
@@ -675,12 +753,20 @@ var lineEls = {}, edgeHost = document.getElementById("edgeAdv");
     row.querySelector("span").textContent = d[1];
     var inp = row.querySelector("input"), out = row.querySelector("b"), bt = row.querySelectorAll("button");
     inp.min = d[2]; inp.max = d[3]; inp.step = d[4]; inp.setAttribute("aria-label", d[1]);
-    function set(v){ state[d[0]] = Math.max(d[2], Math.min(d[3], Math.round(v / d[4]) * d[4])); inp.value = state[d[0]]; out.textContent = (+state[d[0]]).toFixed(d[5]); placeWipe(); }
+    var pos = d[0] === "wp" || d[0] === "wp2";
+    // inch mode: positions are shown and edited in inches (stored in mm, so links and JSON keep their meaning);
+    // the slider moves in 0.001 in, the -/+ buttons by one division of the chosen precision
+    function set(v){
+      if (pos && lineF()){ state[d[0]] = Math.max(d[2], Math.min(d[3], +(v * IN_MM).toFixed(4))); }
+      else state[d[0]] = Math.max(d[2], Math.min(d[3], Math.round(v / d[4]) * d[4]));
+      lineSync(d[0]); placeWipe();
+    }
     inp.addEventListener("input", function(){ set(+inp.value); });
     inp.addEventListener("change", function(){ lastSvg = ""; schedule(); });
-    bt[0].addEventListener("click", function(){ set(state[d[0]] - d[6]); lastSvg = ""; schedule(); });
-    bt[1].addEventListener("click", function(){ set(state[d[0]] + d[6]); lastSvg = ""; schedule(); });
-    lineEls[d[0]] = { inp: inp, out: out, dec: d[5] };
+    function bump(sg){ if (pos && lineF()) set(state[d[0]] / IN_MM + sg / state.ip); else set(state[d[0]] + sg * d[6]); lastSvg = ""; schedule(); }
+    bt[0].addEventListener("click", function(){ bump(-1); });
+    bt[1].addEventListener("click", function(){ bump(1); });
+    lineEls[d[0]] = { inp: inp, out: out, dec: d[5], lbl: row.querySelector("span"), txt: d[1], d: d };
     edgeHost.appendChild(row);
   });
 })();
@@ -711,25 +797,31 @@ var dotEls = {};
   dotEls[d[0]] = { sel: sel, pick: pick };
   advEl.appendChild(row);
 });
-rb.addEventListener("click", function(){ state.ov = {}; state.adv = Object.assign({}, ADV); var rd0 = resDefaults(state.r); state.adv.tx = rd0.tx; state.wp = rd0.wp; state.df = DEF.df; state.dl = DEF.dl; state.d2f = DEF.d2f; state.d2l = DEF.d2l; state.dv = DEF.dv; state.d2v = DEF.d2v; schedule(); });
+rb.addEventListener("click", function(){ state.ov = {}; state.adv = Object.assign({}, ADV); var rd0 = sysDefaults(state); state.adv.tx = rd0.tx; state.wp = rd0.wp; state.df = DEF.df; state.dl = DEF.dl; state.d2f = DEF.d2f; state.d2l = DEF.d2l; state.dv = DEF.dv; state.d2v = DEF.d2v; schedule(); });
 advEl.appendChild(rb);
 
 /* ===== primary controls ===== */
-["t","r","u","l","g"].forEach(function(name){
+["t","r","u","l","g","us","ip"].forEach(function(name){
   document.querySelectorAll('input[name="'+name+'"]').forEach(function(el){
     el.addEventListener("change", function(){
-      if (name === "r"){
-        var od = resDefaults(state.r), nd = resDefaults(+el.value);
-        if (state.adv.tx === od.tx) state.adv.tx = nd.tx;
-        if (state.wp === od.wp) state.wp = nd.wp;
+      if (name === "r" || name === "us" || name === "ip"){
+        // the edge sign follows Tami's spacing rule for the new resolution / precision unless it was moved by hand
+        var nx = Object.assign({}, state); nx[name] = name === "us" ? el.value : +el.value;
+        var od = sysDefaults(state), nd = sysDefaults(nx);
+        if (Math.abs(state.adv.tx - od.tx) < 1e-6) state.adv.tx = nd.tx;
+        if (Math.abs(state.wp - od.wp) < 1e-6) state.wp = nd.wp;
+        if (name === "us"){   // length: keep the physical length when it maps onto the other range, else that system's default
+          var sm = state.us === "inch" ? state.s * IN_MM : state.s;
+          state.s = el.value === "inch" ? Math.max(1, Math.min(12, Math.round(sm / IN_MM))) : Math.max(10, Math.min(300, Math.round(sm)));
+          if (el.value === "inch" && state.s === 1 && sm < 25.4 * 0.75) state.s = LEN.inch[2];        }
       }
-      state[name] = name === "r" ? +el.value : el.value; schedule();
+      state[name] = (name === "r" || name === "ip") ? +el.value : el.value; lastSvg = ""; schedule();
     });
   });
 });
 var sIn = document.getElementById("s");
 sIn.addEventListener("input", function(){ state.s = +sIn.value; schedule(); });
-function stepLen(d){ state.s = Math.max(10, Math.min(300, state.s + d)); schedule(); }
+function stepLen(d){ var L = lenOf(state); state.s = Math.max(L[0], Math.min(L[1], state.s + d)); schedule(); }
 document.getElementById("minus").addEventListener("click", function(){ stepLen(-1); });
 document.getElementById("plus").addEventListener("click", function(){ stepLen(1); });
 
@@ -740,16 +832,23 @@ var mq = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") :
 var pending = false, lastSvg = "";
 
 function syncControls(){
-  ["t","r","u","l","g"].forEach(function(name){
+  ["t","r","u","l","g","us","ip"].forEach(function(name){
     document.querySelectorAll('input[name="'+name+'"]').forEach(function(el){ el.checked = String(state[name]) === el.value; });
   });
+  var INS = state.us === "inch", LS = lenOf(state);
+  document.getElementById("rSeg").style.display = INS ? "none" : "";
+  document.getElementById("ipSeg").style.display = INS ? "" : "none";
+  document.getElementById("uCard").style.display = INS ? "none" : "";
+  document.getElementById("keyLbl").textContent = INS ? "Only inch + ½" : "Only 0·5·10";
+  sIn.min = LS[0]; sIn.max = LS[1]; sIn.setAttribute("aria-label", INS ? "Length in inches" : "Length in millimeters");
   sIn.value = state.s;
-  spanOut.textContent = state.s + " mm" + (state.s % 10 === 0 ? "  ·  " + (state.s/10) + " cm" : "");
+  if (INS) spanOut.textContent = state.s + " in  ·  " + g(state.s * IN_MM) + " mm";
+  else spanOut.textContent = state.s + " mm" + (state.s % 10 === 0 ? "  ·  " + (state.s/10) + " cm" : "");
   Object.keys(advInputs).forEach(function(k){
     var a = advInputs[k]; a.inp.value = state.adv[k]; a.out.textContent = (+state.adv[k]).toFixed(a.dec);
   });
   document.querySelectorAll('input[name="wv"]').forEach(function(el){ el.checked = el.value === state.wv; });
-  Object.keys(lineEls).forEach(function(k){ var e = lineEls[k]; e.inp.value = state[k]; e.out.textContent = (+state[k]).toFixed(e.dec); });
+  Object.keys(lineEls).forEach(lineSync);
   ["dv","d2v"].forEach(function(n){ document.querySelectorAll('input[name="'+n+'"]').forEach(function(el){ el.checked = el.value === state[n]; }); });
   Object.keys(dotEls).forEach(function(k){
     var e = dotEls[k], v = state[k], custom = !/^(light|dark|mark|body)$/.test(v);
@@ -835,8 +934,8 @@ function bindWipe(){
       var r = wipe.getBoundingClientRect(), svg = wipe.querySelector("svg");
       var W = +svg.getAttribute("viewBox").split(" ")[2], X0 = +svg.getAttribute("data-x0");
       var px = (e.clientX - r.left) / r.width * W;                       // drawing units
-      state[L[1]] = Math.max(-30, Math.min(330, Math.round((px - X0) / S / 0.05) * 0.05)); placeWipe();
-      var el = lineEls[L[1]]; if (el){ el.inp.value = state[L[1]]; el.out.textContent = state[L[1]].toFixed(2); }
+      state[L[1]] = Math.max(-30, Math.min(330, lineSnap((px - X0) / S))); placeWipe();
+      lineSync(L[1]);
     });
     grab.addEventListener("pointerup", function(){ drag = false; lastSvg = ""; schedule(); });
   });
@@ -851,6 +950,8 @@ window.addEventListener("hashchange", function(){ readHash(); schedule(); });
 
 /* ===== downloads (exports always use the exact reference look) ===== */
 function fname(ext){
+  if (state.us === "inch") return "clevermetric-" + (state.t === "flip" ? "light" : "dark") + "-inch-1-" + state.ip +
+    "-" + state.l + "-" + state.s + "in." + ext;
   return "clevermetric-" + (state.t === "flip" ? "light" : "dark") + "-" + (state.r === 1 ? "1mm" : "half-mm") +
     "-" + state.u + "-" + state.l + "-" + state.s + "mm." + ext;
 }
@@ -862,12 +963,15 @@ function save(blob, name){
 }
 /* settings as JSON: every control, the slider position, colours, logo and all advanced values */
 function settingsJSON(){
-  return { app: "clevermetric", version: 1,
-    theme: state.t, resolution: state.r, unit: state.u, labels: state.l, length_mm: state.s,
+  var INJ = state.us === "inch";
+  // inch mode adds unit_system + inch_precision + length_in; every older field keeps its name and meaning
+  // (length_mm is the physical length, line positions stay in mm), so a metric file is unchanged
+  return Object.assign({ app: "clevermetric", version: 1 }, INJ ? { unit_system: "inch", inch_precision: state.ip, length_in: state.s } : {}, {
+    theme: state.t, resolution: state.r, unit: state.u, labels: state.l, length_mm: INJ ? +(state.s * IN_MM).toFixed(3) : state.s,
     logo: state.g === "1", invert_line1_mm: +(+state.wp).toFixed(3), invert_line_angle_deg: +(+state.wa).toFixed(2), invert_line_visible: state.wv === "1", invert_line2_mm: +(+state.wp2).toFixed(3), invert_line2_angle_deg: +(+state.wa2).toFixed(2),
     dot_fill: state.df, dot_outline: state.dl, dot_visible: state.dv === "1",
     dot2_visible: state.d2v === "1", dot2_fill: state.d2f, dot2_outline: state.d2l,
-    advanced: Object.assign({}, state.adv), overrides: JSON.parse(JSON.stringify(state.ov || {})) };
+    advanced: Object.assign({}, state.adv), overrides: JSON.parse(JSON.stringify(state.ov || {})) });
 }
 function applyJSON(j){
   if (!j || j.app !== "clevermetric") throw new Error("not a Clevermetric settings file");
@@ -875,7 +979,10 @@ function applyJSON(j){
   if (j.resolution === 1 || j.resolution === 0.5) state.r = j.resolution;
   if (j.unit === "mm" || j.unit === "cm") state.u = j.unit;
   if (j.labels === "all" || j.labels === "key") state.l = j.labels;
-  if (isFinite(+j.length_mm)) state.s = Math.max(10, Math.min(300, Math.round(+j.length_mm)));
+  state.us = j.unit_system === "inch" ? "inch" : "metric";   // a file without unit_system is a metric design
+  state.ip = [8, 16, 32, 10].indexOf(+j.inch_precision) >= 0 ? +j.inch_precision : DEF.ip;
+  if (state.us === "inch") state.s = isFinite(+j.length_in) ? Math.max(1, Math.min(12, Math.round(+j.length_in))) : LEN.inch[2];
+  else if (isFinite(+j.length_mm)) state.s = Math.max(10, Math.min(300, Math.round(+j.length_mm)));
   if (typeof j.logo === "boolean") state.g = j.logo ? "1" : "0";
   if (isFinite(+j.invert_line1_mm)) state.wp = Math.max(-30, Math.min(330, +j.invert_line1_mm));
   if (isFinite(+j.invert_line_angle_deg)) state.wa = Math.max(-60, Math.min(60, +j.invert_line_angle_deg));
@@ -937,7 +1044,15 @@ document.getElementById("dlPng").addEventListener("click", function(){
 var ED = { z:1, k:1, W:0, geo:null, sel:{ kind:null, keys:[], scope:"one", anchor:null, x:null },
   drag:null, tap:null, handles:[], peek:false, peeked:"", multi:false, lastTap:null, insSig:"",
   fields:[], guide:null, zoomFocus:null, keep:null, cropU:0, k1:1, pad:0, fold:false };
-var RANK_LBL = { "0":"0/10", "5":"5", "3":"3/8", "2":"2/7", "1":"1/4/6/9", "h":"½ mm" };
+var RANK_LBL = { "0":"0/10", "5":"5", "3":"3/8", "2":"2/7", "1":"1/4/6/9", "h":"½ mm",
+  "in":"inch", "1/2":"½ in", "1/4":"¼ in", "1/8":"⅛ in", "1/16":"1/16 in", "1/32":"1/32 in", "1/10":"1/10 in" };
+/* unit system (inch mode): marks still live in mm on the drawing; ranks and sizes come from the page's INCH table */
+function isInch(){ return state.us === "inch"; }
+function resMM(){ return isInch() ? IN_MM / state.ip : state.r; }          // one division in mm
+function spanMM(){ return isInch() ? state.s * IN_MM : state.s; }
+function divOf(m){ return Math.round(m / resMM()); }
+function markName(key){ if (!isInch()) return esc(key) + " mm"; var d = divOf(+key); return iLabel(d, state.ip) + " in"; }
+function lineMul(){ return isInch() ? IN_MM : 1; }                          // flip line readout: inches in inch mode
 var SIGN_KEYS = ["ts","tx","ty","dd","dg","ow","em","d2d","d2x","d2y","d2o"].filter(function(k){ return ADV[k] != null; });
 var Z_STEPS = [1, 1.5, 2, 3, 4, 6, 8];
 var LIM = { tx:[-8,-0.5,0.05], em:[0.1,6,0.05], d2d:[0.05,1.5,0.005], d2x:[-8,12,0.05], d2y:[-1.8,1.8,0.01], d2o:[0,1.5,0.005] };
@@ -949,12 +1064,12 @@ var iTitle = document.getElementById("iTitle"), iScope = document.getElementById
 function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
 function f2(v, d){ return (+v).toFixed(d == null ? 2 : d).replace(/^-/, "−"); }
 function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]; }); }
-function rankOf(m){ return Math.abs(m - Math.round(m)) > 1e-9 ? "h" : rank(mod10(Math.round(m))); }
-function rankLeg(m){ return state.adv["g" + rankOf(m)]; }
-function rankNum(n){ return state.adv["n" + rank(mod10(Math.round(n)))]; }
+function rankOf(m){ if (isInch()) return iRank(divOf(m), state.ip); return Math.abs(m - Math.round(m)) > 1e-9 ? "h" : rank(mod10(Math.round(m))); }
+function rankLeg(m){ return isInch() ? INCH.LEG[rankOf(m)] : state.adv["g" + rankOf(m)]; }
+function rankNum(n){ return isInch() ? INCH.NUM[rankOf(n)] : state.adv["n" + rank(mod10(Math.round(n)))]; }
 function ovOf(key){ return (state.ov && state.ov[key]) || {}; }
 function markH(key){ var o = ovOf(key); return o.h != null ? o.h : rankLeg(+key); }
-function markW(key){ var o = ovOf(key); return o.w != null ? Math.min(o.w, state.r * 0.49) : state.adv.w; }
+function markW(key){ var o = ovOf(key); return o.w != null ? Math.min(o.w, resMM() * 0.49) : state.adv.w; }
 function numZ(key){ var o = ovOf(key); return o.z != null ? o.z : rankNum(+key); }
 function xU(mm){ return ED.geo.X0e + mm * ED.geo.S; }
 function P(px){ return px / (ED.k || 1); }            // screen px -> SVG user units
@@ -970,7 +1085,7 @@ function findNum(key){
   return null;
 }
 function marksInRank(r){ return ED.geo.marks.filter(function(mk){ return mk.m <= ED.geo.br && rankOf(mk.m) === r; }); }
-function numsInRank(r){ return ED.geo.nums.filter(function(nm){ return rank(mod10(nm.n)) === r; }); }
+function numsInRank(r){ return ED.geo.nums.filter(function(nm){ return (isInch() ? rankOf(nm.n) : rank(mod10(nm.n))) === r; }); }
 function selKeys(){
   var s = ED.sel;
   if (s.scope !== "rank" || s.anchor == null) return s.keys;
@@ -1035,9 +1150,10 @@ function pick(p, noHandles){
 function isDraggable(hit){ return /^(handle|tri|dot|dot2|line1|line2)$/.test(hit.kind); }
 /* FastCap logo + Clevemetric wordmark box (same maths as build(): logo X(1)..X(4.55), wordmark X(5.5)..X(9)) */
 function logoBox(){
-  var G = ED.geo; if (!G || state.s < 5) return null;
-  var lh = (xU(4.55) - xU(1)) * 116 / 488, y0 = G.top + 20;
-  return [xU(1), y0, state.s >= 9 ? xU(9) : xU(4.55), y0 + lh];
+  var G = ED.geo; if (!G || spanMM() < 5) return null;
+  var LG = isInch() ? INCH.LOGO : [1, 4.55], WD = isInch() ? INCH.WORD : [5.5, 9];
+  var lh = (xU(LG[1]) - xU(LG[0])) * 116 / 488, y0 = G.top + 20;
+  return [xU(LG[0]), y0, spanMM() >= 9 ? xU(WD[1]) : xU(LG[1]), y0 + lh];
 }
 /* flip line n (1|2) as drawn: top and bottom points in drawing units (see flipPolys) */
 function lineSeg(n){
@@ -1092,7 +1208,7 @@ function tapSelect(hit, e){
 }
 
 /* ---------- field model (shared by inspector, keyboard and reset) ---------- */
-function advDefault(key){ return key === "tx" && typeof resDefaults === "function" ? resDefaults(state.r).tx : ADV[key]; }
+function advDefault(key){ return key === "tx" && typeof resDefaults === "function" ? (typeof sysDefaults === "function" ? sysDefaults(state) : resDefaults(state.r)).tx : ADV[key]; }
 function advField(key, label){
   var d = null; ADV_UI.forEach(function(x){ if (x[0] === key) d = x; });
   if (!d && LIM[key]) d = [key, label, LIM[key][0], LIM[key][1], LIM[key][2]];
@@ -1106,7 +1222,7 @@ function advField(key, label){
   return F;
 }
 function ovField(keys, f, label, step, dec, dfltFn){
-  var lim = f === "w" ? [OV_F.w[0], +(state.r * 0.49).toFixed(3)] : OV_F[f];
+  var lim = f === "w" ? [OV_F.w[0], +(resMM() * 0.49).toFixed(3)] : OV_F[f];
   var val = f === "h" ? markH : f === "w" ? markW : numZ;
   function put(key, v){
     v = +clamp(v, lim[0], lim[1]).toFixed(3);
@@ -1123,7 +1239,7 @@ function ovField(keys, f, label, step, dec, dfltFn){
 }
 /* page-level state (not state.adv): flip lines, visibility toggles, colours */
 function stDefault(key){   // the live page's per-resolution defaults (line 1 / triangle) when it has them
-  if (key === "wp" && typeof resDefaults === "function") return resDefaults(state.r).wp;
+  if (key === "wp" && typeof resDefaults === "function") return (typeof sysDefaults === "function" ? sysDefaults(state) : resDefaults(state.r)).wp;
   return DEF[key];
 }
 function stField(key, label, min, max, step, dec){
@@ -1133,6 +1249,16 @@ function stField(key, label, min, max, step, dec){
     isOv:function(){ return Math.abs(state[key] - stDefault(key)) > 1e-9; },
     reset:function(){ state[key] = stDefault(key); } };
   F.add = function(dv){ F.set(F.get() + dv); };
+  return F;
+}
+function linePosField(key, n){
+  if (!isInch()) return stField(key, "Line " + n + ": position (mm from 0)", -30, 330, 0.1, 2);
+  var F = { id:key, label:"Line " + n + ": position (in from 0)", step:1 / state.ip, min:-30 / IN_MM, max:330 / IN_MM, dec:4,
+    get:function(){ return state[key] / IN_MM; },
+    set:function(v){ state[key] = +clamp(Math.round(v * 1000) / 1000 * IN_MM, -30, 330).toFixed(4); },
+    isOv:function(){ return Math.abs(state[key] - stDefault(key)) > 1e-6; },
+    reset:function(){ state[key] = stDefault(key); } };
+  F.add = function(dv){ state[key] = +clamp(state[key] + dv * IN_MM, -30, 330).toFixed(4); };
   return F;
 }
 function tglField(key, label, on, off){
@@ -1155,7 +1281,13 @@ function fieldsFor(){
   var s = ED.sel, F = [];
   if (s.kind === "tick" || s.kind === "num"){
     var r = s.anchor != null ? rankOf(+s.anchor) : "1";
-    if (s.scope === "rank"){
+    if (s.scope === "rank" && isInch()){   // inch ranks are fixed: a rank edit writes every mark of the rank
+      var rk = selKeys(), rnk = rk.filter(function(k){ return !!findNum(k); });
+      var rH = ovField(rk, "h", "Leg height · rank " + RANK_LBL[r] + " (mm)", 0.05, 2, function(k){ return rankLeg(+k); });
+      var rZ = rnk.length ? ovField(rnk, "z", "Numeral size · rank " + RANK_LBL[r], 2, 0, function(k){ return rankNum(+k); }) : null;
+      if (s.kind === "num"){ if (rZ) F.push(rZ); F.push(rH); }
+      else { F.push(rH, advField("w", "Leg thickness · whole ruler (mm)")); if (rZ) F.push(rZ); }
+    } else if (s.scope === "rank"){
       if (s.kind === "num" && r !== "h") F.push(advField("n" + r, "Numeral size · rank " + RANK_LBL[r]));
       F.push(advField("g" + r, "Leg height · rank " + RANK_LBL[r] + " (mm)"));
       if (s.kind === "tick"){
@@ -1185,7 +1317,7 @@ function fieldsFor(){
            colField("d2f", "Fill color"), colField("d2l", "Outline color"));
   } else if (s.kind === "line1" || s.kind === "line2"){
     var L = lineKeys(s.kind);
-    F.push(stField(L.p, "Line " + L.n + ": position (mm from 0)", -30, 330, 0.1, 2),
+    F.push(linePosField(L.p, L.n),
            stField(L.a, "Line " + L.n + ": angle (degrees)", -60, 60, 0.5, 1),
            tglField("wv", "Orange lines (both)"));
   } else if (s.kind === "logo"){
@@ -1308,8 +1440,9 @@ function drawOverlay(){
     if (ln){
       oLine(ln.x0, ln.y0, ln.x1, ln.y1, "ln");
       var ydim = G.yk - P(12);   // inside the body, clear of the orange knob in the floor below
-      if (Math.abs(ln.c - G.X0e) > P(2)) oDimH(G.X0e, ln.c, ydim, f2(lmm) + " mm");
-      else oPill(ln.c, ydim, "0.00 mm");
+      var lu = isInch() ? " in" : " mm", ld = isInch() ? 4 : 2;
+      if (Math.abs(ln.c - G.X0e) > P(2)) oDimH(G.X0e, ln.c, ydim, f2(lmm / lineMul(), ld) + lu);
+      else oPill(ln.c, ydim, f2(0, ld) + lu);
       var lang = s.kind === "line2" ? state.wa2 : state.wa, yc = 70 + H / 2, yh = G.top + P(22);
       var xh = ln.c + (yc - yh) * Math.tan(lang * Math.PI / 180) + P(34);
       oLine(xh - P(34), yh, xh, yh, "e");
@@ -1348,7 +1481,7 @@ function drawHover(hit){
 
 /* ---------- inspector ---------- */
 function renderInspector(){
-  var s = ED.sel, sig = [s.kind, s.keys.join(","), s.scope, s.anchor, state.r, state.l, state.s].join("|");
+  var s = ED.sel, sig = [s.kind, s.keys.join(","), s.scope, s.anchor, state.r, state.l, state.s, state.us, state.ip].join("|");
   if (sig !== ED.insSig){ ED.insSig = sig; buildInspector(); }
   updateInspector();
 }
@@ -1437,7 +1570,7 @@ function updateInspector(){
   if (!s.kind){
     title = 'Nothing selected <small>· tap any part of the ruler to edit it</small>';
     acts.push(["pick-tri", "Triangle"], ["pick-dot", "Dot 1"], ["pick-dot2", "Dot 2"], ["pick-line1", "Line 1"], ["pick-line2", "Line 2"], ["pick-blk", "Block"]);
-    if (state.s >= 5) acts.push(["pick-logo", "Logo"]);
+    if (spanMM() >= 5) acts.push(["pick-logo", "Logo"]);
     var n = Object.keys(state.ov || {}).length;
     if (n){ P_.push('<b>' + n + '</b> ticks/numerals with their own value'); acts.push(["clear-all-ov", "Clear all individual values"]); }
   } else if (s.kind === "tick" || s.kind === "num"){
@@ -1445,21 +1578,21 @@ function updateInspector(){
     var isN = s.kind === "num", noun = isN ? "Numeral" : "Tick";
     if (s.scope === "rank") title = "Whole rank " + RANK_LBL[r] + " <small>· " + keys.length + (isN ? " numerals" : " ticks") + "</small>";
     else if (keys.length > 1) title = keys.length + (isN ? " numerals selected" : " ticks selected") + " <small>· drag/edit together</small>";
-    else title = noun + " " + esc(s.anchor) + " mm <small>· rank " + RANK_LBL[r] + "</small>";
+    else title = noun + " " + markName(s.anchor) + " <small>· rank " + RANK_LBL[r] + "</small>";
     var A = s.anchor;
     if (A != null && findMark(A)){
-      var h = markH(A), w = markW(A), dfl = rankLeg(+A), res = state.r;
+      var h = markH(A), w = markW(A), dfl = rankLeg(+A), res = resMM();
       row("Leg", f2(h) + " mm" + (Math.abs(h - dfl) > 1e-9 ? " (rank " + f2(dfl) + ")" : ""));
       row("Thickness", f2(w, 3) + " mm");
-      row("vs 0/10", Math.round(h / a.g0 * 100) + "%");
-      var L = findMark(okey(+A - res)), R = findMark(okey(+A + res));
+      row(isInch() ? "vs inch" : "vs 0/10", Math.round(h / (isInch() ? INCH.LEG["in"] : a.g0) * 100) + "%");
+      var L = findMark(okey(divOf(+A) * res - res)), R = findMark(okey(divOf(+A) * res + res));
       if (L || R) row("Neighbours", (L ? f2(L.h) : "–") + " ← · → " + (R ? f2(R.h) : "–"));
       row("Above the block", f2(h - a.b) + " mm");
       if (h <= a.b) P_.push('<span class="warnline">⚠ The leg is shorter than the block depth — it gets swallowed</span>');
     }
     if (A != null && findNum(A)){
       var z = numZ(A);
-      row("Numeral", z + " (" + f2(z / S) + " mm) · vs 0/10 ×" + f2(z / a.n0));
+      row("Numeral", z + " (" + f2(z / S) + " mm) · " + (isInch() ? "vs inch ×" + f2(z / INCH.NUM["in"]) : "vs 0/10 ×" + f2(z / a.n0)));
     }
     if (s.scope === "rank"){
       var priv = keys.filter(function(k){ var o = ovOf(k); return isN ? o.z != null : (o.h != null || o.w != null); }).length;
@@ -1472,7 +1605,7 @@ function updateInspector(){
   } else if (s.kind === "blk"){
     title = "Block <small>· the black band between the legs</small>";
     row("Depth", f2(a.b) + " mm"); row("Leg thickness", f2(a.w, 3) + " mm");
-    row("Band width", f2(state.r - 2 * a.w, 3) + " mm"); row("Depth vs shortest leg", Math.round(a.b / (state.r === 0.5 ? a.gh : a.g1) * 100) + "%");
+    row("Band width", f2(resMM() - 2 * a.w, 3) + " mm"); row("Depth vs shortest leg", Math.round(a.b / (isInch() ? Math.min(INCH.LEG[iRank(1, state.ip)], INCH.LEG[iRank(-1, state.ip)]) : state.r === 0.5 ? a.gh : a.g1) * 100) + "%");
     acts.push(["reset-sel", "Reset block"]);
   } else if (s.kind === "tri"){
     var th = a.ts * Math.sqrt(3) / 2;
@@ -1495,16 +1628,16 @@ function updateInspector(){
     acts.push(["reset-sign", "Reset the edge sign"]);
   }
   if (s.kind === "line1" || s.kind === "line2"){
-    var LK = lineKeys(s.kind), lmm = state[LK.p], vis = lmm > -ext0() - 1.3 && lmm < state.s + 1.6;
+    var LK = lineKeys(s.kind), lmm = state[LK.p], vis = lmm > -ext0() - 1.3 && lmm < (G ? G.br : spanMM() + 1.6);
     title = "Orange line " + LK.n + " <small>· drag the orange handle · flips the materials " + (LK.n === 1 ? "left" : "right") + " of it</small>";
-    row("Position", f2(lmm) + " mm from 0"); row("Angle", f2(state[LK.a], 1) + "°");
+    row("Position", isInch() ? f2(lmm / IN_MM, 4) + " in from 0 (" + f2(lmm) + " mm)" : f2(lmm) + " mm from 0"); row("Angle", f2(state[LK.a], 1) + "°");
     if (!vis) P_.push('<span class="warnline">The line is outside the ruler, so nothing is flipped. Use “Bring onto the ruler”.</span>');
     if (state.wv !== "1") P_.push('<span class="warnline">Lines are hidden — the flip still applies.</span>');
     if (!vis) acts.push(["line-here", "Bring onto the ruler"]); else acts.push(["line-reset", "No flip (move off the ruler)"]);
     acts.push(["line-def", "Default position"]);
   }
   if (s.kind === "logo"){
-    title = "Logo <small>· FastCap logo + Clevemetric wordmark" + (state.s < 9 ? " (wordmark needs ≥ 9 mm)" : "") + "</small>";
+    title = "Logo <small>· FastCap logo + Clevemetric wordmark" + (spanMM() < 9 ? " (wordmark needs ≥ 9 mm)" : "") + "</small>";
     row("Shown", state.g === "1" ? "yes" : "no");
   }
   iTitle.innerHTML = title;
@@ -1527,12 +1660,12 @@ iProps.addEventListener("click", function(e){
   else if (act === "line-here" || act === "line-reset"){
     var LK = lineKeys(s.kind);
     if (act === "line-reset") state[LK.p] = LK.n === 1 ? -30 : 330;
-    else state[LK.p] = LK.n === 1 ? Math.min(state.wp2 - 1, 3) : Math.max(state.wp + 1, Math.min(state.s - 2, 8));
+    else state[LK.p] = LK.n === 1 ? Math.min(state.wp2 - 1, 3) : Math.max(state.wp + 1, Math.min(spanMM() - 2, isInch() ? IN_MM : 8));
     state[LK.p] = clamp(+(+state[LK.p]).toFixed(2), -30, 330);
     lastSvg = ""; schedule();
   }
   else if (act === "line-def"){ var LD = lineKeys(s.kind); state[LD.p] = stDefault(LD.p); state[LD.a] = 0; lastSvg = ""; schedule(); }
-  else if (act === "pick-blk") setSel("blk", [], "one", null, G ? xU(Math.min(2, state.s / 2)) : null);
+  else if (act === "pick-blk") setSel("blk", [], "one", null, G ? xU(Math.min(isInch() ? resMM() * 2 : 2, spanMM() / 2)) : null);
   else if (act === "scope-rank") setSel(s.kind, s.keys, "rank", s.anchor);
   else if (act === "scope-one") setSel(s.kind, [s.anchor], "one", s.anchor);
   else if (act === "clear-all-ov"){ state.ov = {}; schedule(); }
@@ -1553,7 +1686,7 @@ iScope.addEventListener("change", function(e){
 function announce(){
   var s = ED.sel, t = "";
   if (!s.kind) t = "Nothing selected";
-  else if (s.kind === "tick" && s.anchor != null) t = "Selected: tick " + s.anchor + " mm, leg " + f2(markH(s.anchor)) + " mm, thickness " + f2(markW(s.anchor), 3) + " mm";
+  else if (s.kind === "tick" && s.anchor != null) t = "Selected: tick " + markName(s.anchor) + ", leg " + f2(markH(s.anchor)) + " mm, thickness " + f2(markW(s.anchor), 3) + " mm";
   else if (s.kind === "tri") t = "Selected: triangle, center " + f2(state.adv.tx) + " mm";
   else if (s.kind === "dot") t = "Selected: dot 1, diameter " + f2(state.adv.dd, 3) + " mm";
   else if (s.kind === "dot2") t = "Selected: dot 2, diameter " + f2(state.adv.d2d, 3) + " mm";
@@ -1580,13 +1713,13 @@ function dragApply(e){
   ED.guide = null;
   if (id === "line1" || id === "line2"){   // drag the flip line itself (same 0.05 mm snap as the page's handle)
     var key = id === "line2" ? "wp2" : "wp", v0 = id === "line2" ? d.wp20 : d.wp0;
-    state[key] = clamp(Math.round((v0 + (e.clientX - d.cx0) / pxmm()) / 0.05) * 0.05, -30, 330);
-    state[key] = +state[key].toFixed(2);
+    state[key] = clamp(lineSnap(v0 + (e.clientX - d.cx0) / pxmm()), -30, 330);
+    state[key] = +state[key].toFixed(isInch() ? 4 : 2);
     placeWipe(); drawOverlay(); updateInspector(); return;
   }
   if (id === "tri" || id === "move" || id === "dot"){
     // keep the sign inside the body extension and left of the first band
-    var txLo = Math.min(A0.tx, HAS_EM ? -8 : -3.25 + A0.ts / 2), txHi = Math.max(A0.tx, -state.r - A0.ts / 2);
+    var txLo = Math.min(A0.tx, HAS_EM ? -8 : -3.25 + A0.ts / 2), txHi = Math.max(A0.tx, -resMM() - A0.ts / 2);
     a.tx = clamp(snap(A0.tx + dx, st), txLo, txHi);
     if (id === "dot") a.dg = clamp(snap(A0.dg + dy, Math.min(st, 0.05)), 0, 1.5);
     else {
@@ -1616,7 +1749,7 @@ function dragApply(e){
     a.b = clamp(snap(A0.b + dy, Math.min(st, 0.05)), 0.1, 1);
   } else if (id === "h" || id === "w" || id === "z"){
     var keys = selKeys(), r = s.anchor != null ? rankOf(+s.anchor) : "1";
-    if (s.scope === "rank"){
+    if (s.scope === "rank" && !isInch()){
       if (id === "h") a["g" + r] = clamp(snap(A0["g" + r] + dy, st), 0.2, 3.3);
       else if (id === "w") a.w = clamp(snap(A0.w + (findMark(s.anchor).side === "L" ? dx : -dx), 0.005), 0.03, 0.3);
       else if (r !== "h") a["n" + r] = clamp(Math.round(A0["n" + r] + dy * S), 12, 120);
@@ -1634,7 +1767,7 @@ function dragApply(e){
           if (Math.abs(nv - dfl) * pm < 5) nv = dfl;
           ovSet(state.ov, +k, "h", Math.abs(nv - dfl) < 1e-9 ? null : nv);
         } else {
-          var w0 = o0.w != null ? o0.w : a.w, nw = clamp(snap(w0 + (side === "L" ? dx : -dx), 0.005), 0.01, +(state.r * 0.49).toFixed(3));
+          var w0 = o0.w != null ? o0.w : a.w, nw = clamp(snap(w0 + (side === "L" ? dx : -dx), 0.005), 0.01, +(resMM() * 0.49).toFixed(3));
           ovSet(state.ov, +k, "w", Math.abs(nw - a.w) < 1e-9 ? null : nw);
         }
       });
@@ -1716,10 +1849,15 @@ scroller.addEventListener("contextmenu", function(e){ if (e.pointerType !== "mou
    ruler. Here the fit is computed as if the sign sat at its default, so the scale never depends on the
    sign; the 0 mark is then held still on screen (scroll when the body grows left, padding when it
    shrinks) and the triangle moves with the pointer. Short viewports also cap the ruler height. */
-var EXT0 = null;
+var EXT0 = null, EXT0K = "";
 function extOf(geo){ return (geo.X0e - X0) / S; }
 function ext0(){
-  if (EXT0 == null){ try { EXT0 = extOf(build(Object.assign({}, state, { adv:Object.assign({}, ADV), ov:{} }), null).geo); } catch (e) { EXT0 = 2; } }
+  var key = isInch() ? "in" + state.ip : "m";
+  if (EXT0 == null || EXT0K !== key){
+    EXT0K = key;
+    var dadv = Object.assign({}, ADV, isInch() ? { tx: sysDefaults(state).tx } : {});
+    try { EXT0 = extOf(build(Object.assign({}, state, { adv:dadv, ov:{} }), null).geo); } catch (e) { EXT0 = 2; }
+  }
   return EXT0;
 }
 function viewH(){ return document.documentElement.clientHeight || window.innerHeight || 800; }
@@ -1838,7 +1976,7 @@ document.addEventListener("keydown", function(e){
     else if (k === "[") done = nudge(s.kind === "tri" ? "ts" : "dd", s.kind === "tri" ? -0.05 : -0.01);
     else if (k === "]") done = nudge(s.kind === "tri" ? "ts" : "dd", s.kind === "tri" ? 0.05 : 0.01);
   } else if (s.kind === "tick" || s.kind === "num"){
-    var r = s.anchor != null ? rankOf(+s.anchor) : "1", hid = s.scope === "rank" ? "g" + r : "h", zid = s.scope === "rank" ? "n" + r : "z";
+    var RS = s.scope === "rank" && !isInch(), r = s.anchor != null ? rankOf(+s.anchor) : "1", hid = RS ? "g" + r : "h", zid = RS ? "n" + r : "z";
     if (k === "ArrowLeft"){ stepSel(-1, e.shiftKey); done = true; }
     else if (k === "ArrowRight"){ stepSel(1, e.shiftKey); done = true; }
     else if (k === "ArrowUp") done = s.kind === "num" ? nudge(zid, fine ? 1 : 2) : nudge(hid, fine ? 0.01 : 0.05);
@@ -1856,8 +1994,9 @@ document.addEventListener("keydown", function(e){
     else if (k === "]") done = nudge("d2d", 0.01);
   } else if (s.kind === "line1" || s.kind === "line2"){
     var LK = lineKeys(s.kind);
-    if (k === "ArrowLeft") done = nudge(LK.p, fine ? -0.05 : e.shiftKey ? -1 : -0.1);
-    else if (k === "ArrowRight") done = nudge(LK.p, fine ? 0.05 : e.shiftKey ? 1 : 0.1);
+    var lst = isInch() ? (fine ? 0.001 : e.shiftKey ? 0.25 : 1 / state.ip) : (fine ? 0.05 : e.shiftKey ? 1 : 0.1);
+    if (k === "ArrowLeft") done = nudge(LK.p, -lst);
+    else if (k === "ArrowRight") done = nudge(LK.p, lst);
     else if (k === "ArrowUp") done = nudge(LK.a, 0.5);
     else if (k === "ArrowDown") done = nudge(LK.a, -0.5);
   } else if (s.kind === "blk"){
