@@ -77,6 +77,7 @@ summary::after{content:"";width:9px;height:9px;border-inline-end:2px solid var(-
 details[open] summary::after{transform:rotate(-135deg);margin-top:4px}
 .adv{padding:0 14px 14px;display:grid;gap:4px 22px;grid-template-columns:minmax(0,1fr)}
 @media (min-width:860px){ .adv{grid-template-columns:repeat(3,minmax(0,1fr))} }
+.dotcol{display:flex;gap:10px;align-items:center}.dotcol select{flex:1;min-width:0;font:inherit;padding:8px 10px;border-radius:10px;border:1px solid var(--line,#ccd);background:transparent;color:inherit}.dotcol input[type=color]{width:44px;height:36px;border:0;padding:0;background:none}
 .adv h3{grid-column:1/-1;font-size:13px;color:var(--muted);margin:12px 2px 0;font-weight:600}
 .row .label{margin-bottom:0}
 .row input[type=range]{width:100%;direction:ltr;height:40px}
@@ -181,8 +182,9 @@ var ADV = {   // ruler.py defaults
   g0:2.55, g5:2.05, g3:1.58, g2:1.22, g1:0.88, gh:0.55,
   n0:82, n5:62, n3:44, n2:40, n1:38,
   b:0.34, w:0.09,
-  ts:1, tx:-2, dd:0.465, dg:0.287, ty:0   // edge sign: triangle side, centre x, dot diameter, gap, vertical shift (mm)
+  ts:1, tx:-2, dd:0.32, dg:0.287, ty:0, ow:0.045   // edge sign: triangle side, centre x, dot diameter, gap, vertical shift, dot outline (mm)
 };
+var DOT_COL = { fill:"mark", line:"body" };   // dot colours: mark | body | any #hex
 
 function g(x){ return String(+(+x).toFixed(3)); }   // python's :g for our ranges
 function rank(k){ return k===0?"0":k===5?"5":(k===3||k===8)?"3":(k===2||k===7)?"2":"1"; }
@@ -264,13 +266,13 @@ function build(c, screen){
   var gTop = (top + edge) / 2 - groupH / 2 - a.ty * S;
   var ta = gTop + (dd > 0 ? dd + dg : 0), tb = ta + th, dcy = gTop + dd / 2;
   var bodySolid = t.body[2][1];
+  function dotCol(v){ return v === "mark" ? t.ink : v === "body" ? bodySolid : v; }
   o.push('<rect x="'+g(bx0)+'" y="'+top+'" width="'+g(tc - bx0)+'" height="'+bh+'" fill="url(#ink)" shape-rendering="crispEdges"/>');
   o.push('<g shape-rendering="geometricPrecision">' +
     '<path d="M'+g(tc)+','+g(ta)+' L'+g(tc)+','+g(tb)+' L'+g(tc - side/2)+','+g(tb)+' Z" fill="'+bodySolid+'"/>' +
     '<path d="M'+g(tc)+','+g(ta)+' L'+g(tc + side/2)+','+g(tb)+' L'+g(tc)+','+g(tb)+' Z" fill="'+t.ink+'"/>' +
     (dd > 0 ?
-      '<path d="M'+g(tc)+','+g(dcy - dd/2)+' A'+g(dd/2)+','+g(dd/2)+' 0 0 0 '+g(tc)+','+g(dcy + dd/2)+' Z" fill="'+bodySolid+'"/>' +
-      '<path d="M'+g(tc)+','+g(dcy - dd/2)+' A'+g(dd/2)+','+g(dd/2)+' 0 0 1 '+g(tc)+','+g(dcy + dd/2)+' Z" fill="'+t.ink+'"/>' : '') +
+      '<circle cx="'+g(tc)+'" cy="'+g(dcy)+'" r="'+g(Math.max(dd/2 - a.ow*S/2, 0.5))+'" fill="'+dotCol(c.df)+'" stroke="'+dotCol(c.dl)+'" stroke-width="'+g(a.ow*S)+'"/>' : '') +
     '</g>');
   o.push('<rect x="'+g(bx0)+'" y="'+top+'" width="'+g(bw)+'" height="2" fill="'+t.hi+'" opacity="'+t.hi_op+'"/>');
   o.push('</g>');
@@ -311,8 +313,9 @@ function hierarchy(c){
 window.__clever = { build: build, hierarchy: hierarchy, ADV: ADV };   // for tests
 
 /* ===== state + URL hash ===== */
-var DEF = { t:"flip", r:1, u:"mm", l:"all", s:10 };
-var state = { t:DEF.t, r:DEF.r, u:DEF.u, l:DEF.l, s:DEF.s, adv: Object.assign({}, ADV) };
+var DEF = { t:"flip", r:1, u:"mm", l:"all", s:10, df:DOT_COL.fill, dl:DOT_COL.line };
+var state = { t:DEF.t, r:DEF.r, u:DEF.u, l:DEF.l, s:DEF.s, df:DEF.df, dl:DEF.dl, adv: Object.assign({}, ADV) };
+var COL_OK = /^(mark|body|#[0-9a-fA-F]{3,8})$/;
 
 function readHash(){
   try {
@@ -326,12 +329,16 @@ function readHash(){
     if (q.l === "all" || q.l === "key") state.l = q.l;
     if (q.s && isFinite(+q.s)) state.s = Math.max(10, Math.min(300, Math.round(+q.s)));
     Object.keys(ADV).forEach(function(k){ if (q[k] != null && isFinite(+q[k])) state.adv[k] = +q[k]; });
+    if (q.df && COL_OK.test(q.df)) state.df = q.df;
+    if (q.dl && COL_OK.test(q.dl)) state.dl = q.dl;
   } catch (e) {}
 }
 function writeHash(){
   try {
     var parts = ["t="+state.t, "r="+state.r, "u="+state.u, "l="+state.l, "s="+state.s];
     Object.keys(ADV).forEach(function(k){ if (state.adv[k] !== ADV[k]) parts.push(k+"="+state.adv[k]); });
+    if (state.df !== DEF.df) parts.push("df="+encodeURIComponent(state.df));
+    if (state.dl !== DEF.dl) parts.push("dl="+encodeURIComponent(state.dl));
     var h = "#" + parts.join("&");
     if (location.hash === h) return;
     try { history.replaceState(null, "", h); } catch (e) { location.replace(h); }
@@ -350,7 +357,7 @@ var ADV_UI = [
   ["b","עומק בלוק (מ״מ)",0.1,1,0.01], ["w","רוחב רגל (מ״מ)",0.03,0.3,0.005],
   ["h","סימן הקצה: משולש ונקודה (מ״מ)"],
   ["ts","צלע משולש",0.3,3,0.01], ["tx","מיקום (מרכז)",-3,-0.5,0.05], ["ty","הזזה למעלה",-1.2,1.2,0.01],
-  ["dd","קוטר נקודה (0 = בלי)",0,1.5,0.005], ["dg","מרווח לנקודה",0,1.5,0.005]
+  ["dd","קוטר נקודה (0 = בלי)",0,1.5,0.005], ["dg","מרווח לנקודה",0,1.5,0.005], ["ow","עובי קו מתאר לנקודה",0,0.2,0.005]
 ];
 var advEl = document.getElementById("adv"), advInputs = {};
 ADV_UI.forEach(function(d){
@@ -366,7 +373,19 @@ ADV_UI.forEach(function(d){
 });
 var rb = document.createElement("button");
 rb.className = "btn reset"; rb.type = "button"; rb.textContent = "איפוס לברירת מחדל";
-rb.addEventListener("click", function(){ state.adv = Object.assign({}, ADV); schedule(); });
+/* dot colours: mark colour / body colour / custom */
+var dotEls = {};
+[["df","צבע מילוי לנקודה"],["dl","צבע קו מתאר לנקודה"]].forEach(function(d){
+  var row = document.createElement("div"); row.className = "row";
+  row.innerHTML = '<div class="label"><span></span></div><div class="dotcol"><select><option value="mark">צבע הסימון</option><option value="body">צבע הסרגל</option><option value="custom">צבע אחר</option></select><input type="color" value="#c0392b"></div>';
+  row.querySelector("span").textContent = d[1];
+  var sel = row.querySelector("select"), pick = row.querySelector("input");
+  function apply(){ state[d[0]] = sel.value === "custom" ? pick.value : sel.value; pick.style.visibility = sel.value === "custom" ? "visible" : "hidden"; schedule(); }
+  sel.addEventListener("change", apply); pick.addEventListener("input", apply);
+  dotEls[d[0]] = { sel: sel, pick: pick };
+  advEl.appendChild(row);
+});
+rb.addEventListener("click", function(){ state.adv = Object.assign({}, ADV); state.df = DEF.df; state.dl = DEF.dl; schedule(); });
 advEl.appendChild(rb);
 
 /* ===== primary controls ===== */
@@ -395,6 +414,11 @@ function syncControls(){
   spanOut.textContent = state.s + " מ״מ" + (state.s % 10 === 0 ? "  ·  " + (state.s/10) + " ס״מ" : "");
   Object.keys(advInputs).forEach(function(k){
     var a = advInputs[k]; a.inp.value = state.adv[k]; a.out.textContent = (+state.adv[k]).toFixed(a.dec);
+  });
+  Object.keys(dotEls).forEach(function(k){
+    var e = dotEls[k], v = state[k], custom = v !== "mark" && v !== "body";
+    e.sel.value = custom ? "custom" : v; if (custom) e.pick.value = v.length === 7 ? v : e.pick.value;
+    e.pick.style.visibility = custom ? "visible" : "hidden";
   });
 }
 function scale(W){
