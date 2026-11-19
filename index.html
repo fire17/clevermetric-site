@@ -253,6 +253,13 @@ footer{overflow-wrap:anywhere;color:var(--muted);font-size:12.5px;margin:22px 2p
 
   <div class="panel">
     <div class="card">
+      <div class="label">Style</div>
+      <div class="seg" role="radiogroup">
+        <label><input type="radio" name="st" value="band"><span>Japanese edge</span></label>
+        <label><input type="radio" name="st" value="classic"><span>Classic</span></label>
+      </div>
+    </div>
+    <div class="card">
       <div class="label">Color scheme</div>
       <div class="seg" role="radiogroup">
         <label><input type="radio" name="t" value="flip"><span>Light</span></label>
@@ -309,7 +316,7 @@ footer{overflow-wrap:anywhere;color:var(--muted);font-size:12.5px;margin:22px 2p
       </div>
     </div>
 
-    <div class="card full">
+    <div class="card full" id="edgeCard">
       <div class="label">Edge sign: spacing (mm)</div>
       <div class="adv" id="edgeAdv"></div>
     </div>
@@ -381,6 +388,33 @@ function iLabel(k, n){
   var c_ = gcd(k % n, n), f = ((k % n) / c_) + "/" + (n / c_);
   return { "1/2":"½", "1/4":"¼", "3/4":"¾", "1/8":"⅛", "3/8":"⅜", "5/8":"⅝", "7/8":"⅞" }[f] || f;
 }
+/* CLASSIC style (Tami 00:23, classic/make_classic.py): a normal ruler in the same steel. Every graduation is ONE
+   thin centred tick (0.12 mm) rising from the edge; no bands, no edge sign, no material flip.
+   metric + decimal inch: the rising pattern per cm / per inch (0 > 5 > 3/8 > 2/7 > 1/4/6/9, half-mm 0.6);
+   inch fractions: the inch table (height by fraction), labels down to 1/8 */
+var CLASSIC = {
+  TICK: 0.12, HALF: 0.6, SHORT: 0.88, TOP: 2.55, NUMS: 34,
+  RISE: { 0:2.55, 5:2.05, 3:1.58, 8:1.58, 2:1.22, 7:1.22 },
+  NUM: { 0:82, 5:62, 3:44, 8:44, 2:40, 7:40 },
+  LOGO: [1, 4.55], WORD: [5.5, 9]   // the approved preview's logo + wordmark band, metric and inch alike
+};
+function cLeg(m, st){   // tick height (mm) of the mark at m mm from 0
+  if (st.us === "inch"){
+    var ip_ = +st.ip || 16, d_ = Math.round(m * ip_ / IN_MM);
+    if (ip_ === 10){ var r10 = CLASSIC.RISE[((d_ % 10) + 10) % 10]; return r10 != null ? r10 : CLASSIC.SHORT; }
+    return INCH.LEG[iRank(d_, ip_)];
+  }
+  if (Math.abs(m - Math.round(m)) > 1e-9) return CLASSIC.HALF;
+  var r_ = CLASSIC.RISE[((Math.round(m) % 10) + 10) % 10]; return r_ != null ? r_ : CLASSIC.SHORT;
+}
+function cNum(m, st){   // numeral size (px at 100 px/mm) of the mark at m mm (metric: m may be the mm inside the cm)
+  if (st.us === "inch"){
+    var ip_ = +st.ip || 16, d_ = Math.round(m * ip_ / IN_MM);
+    if (ip_ !== 10) return INCH.NUM[iRank(d_, ip_)];
+    var z10 = CLASSIC.NUM[((d_ % 10) + 10) % 10]; return z10 != null ? z10 : CLASSIC.NUMS;
+  }
+  var z_ = CLASSIC.NUM[((Math.round(m) % 10) + 10) % 10]; return z_ != null ? z_ : CLASSIC.NUMS;
+}
 function g(x){ return String(+(+x).toFixed(3)); }   // python's :g for our ranges
 function rank(k){ return k===0?"0":k===5?"5":(k===3||k===8)?"3":(k===2||k===7)?"2":"1"; }
 function mod10(n){ return ((n%10)+10)%10; }
@@ -431,9 +465,10 @@ function ovDecode(str){
 }
 
 function build(c, screen){
-  var t = THEMES[c.t], a = c.adv, IN = c.us === "inch", ip = +c.ip || 16;
+  var t = THEMES[c.t], a = c.adv, IN = c.us === "inch", ip = +c.ip || 16, CL = c.st === "classic";
   var res = IN ? IN_MM / ip : c.r, span = IN ? c.s * IN_MM : c.s;
   var leg = function(m){
+    if (CL) return cLeg(m, c);
     if (IN) return INCH.LEG[iRank(Math.round(m / res), ip)];
     if (Math.abs(m - Math.round(m)) > 1e-9) return a.gh;
     return a["g"+rank(mod10(Math.round(m)))];
@@ -443,16 +478,17 @@ function build(c, screen){
   var ov = function(m){ return OV[okey(m)]; };
   var legH = function(m){ var o = ov(m); return o && o.h != null ? o.h : leg(m); };
   var nSize = function(n){ var o = ov(n); return o && o.z != null ? o.z : numSize(IN ? n : mod10(n)); };
+  if (CL) numSize = function(k){ return cNum(k, c); };   // classic: the approved rising / inch tables
   // EXT: body extension left of 0 holding the split-triangle "the mark is the edge" sign
   // the body grows left with the edge sign so it never clips (default tx=-2, ts=1 keeps EXT at 2.0)
   // left end of the body = triangle's left corner minus the end margin em (defaults keep EXT at 2.0)
-  var EXT = Math.max(0, -c.adv.tx + c.adv.ts / 2 + c.adv.em - 1.3), X0e = X0 + EXT * S;
-  var W = Math.floor(X0e + (span + (IN ? 3.6 : 2.0)) * S);   // inch: room for the longer "in · 1/16" tag
+  var EXT = CL ? 0.9 : Math.max(0, -c.adv.tx + c.adv.ts / 2 + c.adv.em - 1.3), X0e = X0 + EXT * S;   // classic: body from -2.2 mm (no sign)
+  var W = Math.floor(X0e + (span + (IN || CL ? 3.6 : 2.0)) * S);   // inch: room for the longer "in · 1/16" tag
   var X = function(mm){ return X0e + mm * S; };
-  var bl = -1.3 - EXT, br = span + (IN ? 3.2 : 1.6), edge = EDGE_Y, top = BODY_TOP;
+  var bl = -1.3 - EXT, br = span + (IN || CL ? 3.2 : 1.6), edge = EDGE_Y, top = BODY_TOP;
   var bx0 = X(bl), bx1 = X(br), bw = bx1 - bx0, bh = edge - top;
-  var w = a.w * S, yk = edge - a.b * S;
-  var legW = function(m){ var o = ov(m); return o && o.w != null ? Math.min(o.w, res * 0.49) * S : w; };
+  var w = (CL ? CLASSIC.TICK : a.w) * S, yk = CL ? edge : edge - a.b * S;
+  var legW = function(m){ var o = ov(m); return o && o.w != null ? Math.min(o.w, res * (CL ? 0.9 : 0.49)) * S : w; };
   var geo = { S:S, X0e:X0e, edge:edge, top:top, yk:yk, res:res, span:span, bl:bl, br:br, bx0:bx0, bx1:bx1, marks:[], nums:[], bands:[] };
   function band(p){
     var q = p + res, ya = edge - legH(p) * S, yb = edge - legH(q) * S, wl = legW(p), wr = legW(q);
@@ -460,6 +496,11 @@ function build(c, screen){
     geo.bands.push({ p:p, x0:X(p)+wl, x1:X(q)-wr });
     var pts = [[X(p),edge],[X(p),ya],[X(p)+wl,ya],[X(p)+wl,yk],[X(q)-wr,yk],[X(q)-wr,yb],[X(q),yb],[X(q),edge]];
     return "M" + pts.map(function(v){ return g(v[0])+","+g(v[1]); }).join(" L") + " Z";
+  }
+  function tick(p){   // classic: one thin line centred on the graduation, rising from the edge
+    var tw = legW(p), yt = edge - legH(p) * S;
+    geo.marks.push({ m:p, side:"C", x0:X(p) - tw / 2, x1:X(p) + tw / 2, y0:yt, h:legH(p), w:tw / S });
+    return "M" + g(X(p) - tw / 2) + "," + g(edge) + " h" + g(tw) + " V" + g(yt) + " h" + g(-tw) + " Z";
   }
   var floor = ["#ffffff","#eef0f2"], shadowFill = "#2b3036";   // exact v2 floor + shadow, always
   var stops = t.body.map(function(s){ return '<stop offset="'+s[0]+'" stop-color="'+s[1]+'"/>'; }).join("");
@@ -510,10 +551,13 @@ function build(c, screen){
   }
   o.push(SW ? '<rect '+BR+' fill="url(#ink)"/>' : metal());
   var bandPaths = '';
-  if (IN) for (var bk = -1; bk * IN_MM / ip < br; bk += 2) bandPaths += '<path d="'+band(bk * IN_MM / ip)+'"/>';   // exact multiples of 25.4/n
+  if (CL){ var NT = IN ? Math.round(c.s * ip) : Math.round(span / res), tp = [];
+    for (var tk = 0; tk <= NT; tk++) tp.push(tick(IN ? tk * IN_MM / ip : tk * res));
+    bandPaths = '<path d="' + tp.join(" ") + '"/>'; }
+  else if (IN) for (var bk = -1; bk * IN_MM / ip < br; bk += 2) bandPaths += '<path d="'+band(bk * IN_MM / ip)+'"/>';   // exact multiples of 25.4/n
   else for (var p = -res; p < br; p += 2 * res) bandPaths += '<path d="'+band(p)+'"/>';
   if (SW) o.push('<clipPath id="bandclip">'+bandPaths+'</clipPath>' + metal('bandclip'));
-  else o.push('<g fill="url(#ink)" shape-rendering="crispEdges">'+bandPaths+'</g>');
+  else o.push(CL ? '<g fill="url(#ink)">'+bandPaths+'</g>' : '<g fill="url(#ink)" shape-rendering="crispEdges">'+bandPaths+'</g>');
   // edge sign: a vertical split through the extension. Left of it the background is the
   // mark colour, right of it the ruler body; each triangle half takes the opposite colour,
   // so the black/blank switch reads both inside and outside the triangle.
@@ -546,7 +590,7 @@ function build(c, screen){
     return clip + '<g clip-path="url(#'+id+')"><rect '+BODY_RECT+' fill="url(#steel)"/>' +
       '<rect '+BODY_RECT+' filter="url(#grain)" opacity="'+t.grain+'"/><rect '+BODY_RECT+' fill="url(#sheen)"/></g>';
   }
-  o.push(paint("mark", '<rect x="'+g(bx0)+'" y="'+top+'" width="'+g(tc - bx0)+'" height="'+bh+'"/>'));
+  if (!CL) o.push(paint("mark", '<rect x="'+g(bx0)+'" y="'+top+'" width="'+g(tc - bx0)+'" height="'+bh+'"/>'));   // classic: no edge sign
   // layer order (Tami): dot outline at the bottom, both triangle halves over it, the dot itself on top.
   // The outline grows outward from the dot, so the dot is never covered at any thickness.
   var tri = '<g shape-rendering="geometricPrecision">';
@@ -558,10 +602,10 @@ function build(c, screen){
     paint("mark", '<path d="M'+g(tc)+','+g(ta)+' L'+g(tc + side/2)+','+g(tb)+' L'+g(tc)+','+g(tb)+' Z"/>');
   if (dot1) tri += paint(c.df, '<circle cx="'+g(tc)+'" cy="'+g(dcy)+'" r="'+g(dd/2)+'"/>');
   if (dot2) tri += paint(c.d2f, '<circle cx="'+g(d2cx)+'" cy="'+g(d2cy)+'" r="'+g(d2r)+'"/>');
-  o.push(tri + '</g>');
+  if (!CL) o.push(tri + '</g>');
   o.push('<rect x="'+g(bx0)+'" y="'+top+'" width="'+g(bw)+'" height="2" fill="'+t.hi+'" opacity="'+t.hi_op+'"/>');
   o.push('</g>');
-  var LG = IN ? INCH.LOGO : [1, 4.55], WD = IN ? INCH.WORD : [5.5, 9];   // inch: the approved reference's band
+  var LG = CL ? CLASSIC.LOGO : IN ? INCH.LOGO : [1, 4.55], WD = CL ? CLASSIC.WORD : IN ? INCH.WORD : [5.5, 9];   // inch: the approved reference's band
   if (c.g === "1" && span >= 5){
     var lw = X(LG[1]) - X(LG[0]), lh = lw * 116 / 488;   // stays clear of the 5 numeral
     var limg = 'x="'+g(X(LG[0]))+'" y="'+g(top + 20)+'" width="'+g(lw)+'" height="'+g(lh)+'"';
@@ -581,22 +625,24 @@ function build(c, screen){
   for (var ni = 0; ni <= NN; ni++){
     var n = IN ? ni * IN_MM / ip : ni, k = IN ? iRank(ni, ip) : n % 10;
     if (IN ? (c.l === "key" && k !== "in" && k !== "1/2") : (c.l === "key" && k !== 0 && k !== 5)) continue;
-    var col = (IN ? k === "in" : (k === 0 || k === 5)) ? t.num : t.sub;
-    var base = edge - legH(n) * S - NUM_GAP, lbl = IN ? iLabel(ni, ip) : fmt(n, c.u);
+    if (CL && (k === "1/16" || k === "1/32")) continue;   // classic inch: fractions labelled down to 1/8
+    var col = (IN ? (k === "in" || (CL && ip === 10 && k === "1/2")) : (k === 0 || k === 5)) ? t.num : t.sub;
+    var base = edge - legH(n) * S - NUM_GAP, lbl = IN ? iLabel(ni, ip) : CL ? String(k === 0 ? n / 10 : k) : fmt(n, c.u);   // classic: cm count, then 1-9
     txt('<text x="'+g(X(n))+'" y="'+g(base)+'" text-anchor="middle" font-family="'+FONT+'" font-size="'+nSize(n)+'" font-weight="700" fill="'+col+'">'+lbl+'</text>');
     geo.nums.push({ n:n, x:X(n), base:base, size:nSize(n), text:lbl });
     if (ni === NN) lastShown = true;
   }
   // unit tag: ruler.py's offset, pushed right only when a wide last numeral would collide
-  var UT = IN ? "in · 1/" + ip : c.u;
-  var ux = 0.6 * S + ((!IN && c.u === "cm" && fmt(span, c.u).length === 1) ? 0.25 * S : 0);
+  var UT = IN ? "in · 1/" + ip : CL ? (res === 0.5 ? "cm · 0.5 mm" : "cm") : c.u;
+  var ux = 0.6 * S + ((!IN && !CL && c.u === "cm" && fmt(span, c.u).length === 1) ? 0.25 * S : 0);
   if (lastShown){
-    var s = IN ? String(c.s) : fmt(span, c.u), digits = s.replace(/\./g,"").length, dots = s.length - digits;
+    var s = IN ? String(c.s) : CL ? String(span % 10 === 0 ? span / 10 : span % 10) : fmt(span, c.u), digits = s.replace(/\./g,"").length, dots = s.length - digits;
     var half = (digits * 0.55 + dots * 0.28) * nSize(span) / 2;
     ux = Math.max(ux, half + 14);
   }
   var ulx = X(span) + ux, ulw = UT.length * 0.62 * 30 + 4, ulTop = legH(span);
-  for (var um = span + res; X(um) <= ulx + ulw + 2 && um <= br; um += res) ulTop = Math.max(ulTop, legH(um));
+  for (var um = span + res; X(um) <= ulx + ulw + 2 && um <= (CL ? span : br); um += res) ulTop = Math.max(ulTop, legH(um));
+  if (CL) ulTop = Math.max(ulTop, CLASSIC.TOP);   // classic: the tag sits at the cm / inch height (no ticks past the end)
   txt('<text x="'+g(ulx)+'" y="'+g(edge - ulTop * S - NUM_GAP)+'" text-anchor="start" font-family="'+FONT+'" font-size="30" fill="'+t.sub+'" letter-spacing="1">'+UT+'</text>');
   if (SW && TX.length) o.push('<clipPath id="textclip">'+TX.join("")+'</clipPath>' + metal('textclip'));
   o.push('</svg>');
@@ -605,6 +651,7 @@ function build(c, screen){
 
 function hierarchy(c){
   var a = c.adv, msgs = [];
+  if (c.st === "classic") return msgs;   // classic: fixed approved table, no bands
   var L = [["g0","0/10"],["g5","5"],["g3","3/8"],["g2","2/7"],["g1","1/4/6/9"],["gh","½ mm"]];
   for (var i = 0; i < L.length - 1; i++)
     if (!(a[L[i][0]] > a[L[i+1][0]])) msgs.push("Leg length: " + L[i][1] + " should be longer than " + L[i+1][1]);
@@ -618,11 +665,11 @@ function hierarchy(c){
   if (!(2 * a.w < (IN ? IN_MM / ipn : c.r))) msgs.push("Leg width is too large for the band width");
   return msgs;
 }
-window.__clever = { build: build, hierarchy: hierarchy, ADV: ADV, iRank: iRank, iLabel: iLabel, INCH: INCH };   // for tests
+window.__clever = { build: build, hierarchy: hierarchy, ADV: ADV, iRank: iRank, iLabel: iLabel, INCH: INCH, CLASSIC: CLASSIC, cLeg: cLeg, cNum: cNum };   // for tests
 
 /* ===== state + URL hash ===== */
-var DEF = { t:"flip", r:1, u:"mm", l:"all", s:10, df:DOT_COL.fill, dl:DOT_COL.line, g:"1", wp:-2, wa:0, wv:"1", wp2:330, wa2:0, dv:"1", d2v:"0", d2f:"light", d2l:"dark", us:"metric", ip:16 };
-var state = { t:DEF.t, r:DEF.r, u:DEF.u, l:DEF.l, s:DEF.s, df:DEF.df, dl:DEF.dl, g:DEF.g, wp:DEF.wp, wa:DEF.wa, wv:DEF.wv, wp2:DEF.wp2, wa2:DEF.wa2, dv:DEF.dv, d2v:DEF.d2v, d2f:DEF.d2f, d2l:DEF.d2l, us:DEF.us, ip:DEF.ip, adv: Object.assign({}, ADV) };
+var DEF = { t:"flip", r:1, u:"mm", l:"all", s:10, df:DOT_COL.fill, dl:DOT_COL.line, g:"1", wp:-2, wa:0, wv:"1", wp2:330, wa2:0, dv:"1", d2v:"0", d2f:"light", d2l:"dark", us:"metric", ip:16, st:"band" };
+var state = { t:DEF.t, r:DEF.r, u:DEF.u, l:DEF.l, s:DEF.s, df:DEF.df, dl:DEF.dl, g:DEF.g, wp:DEF.wp, wa:DEF.wa, wv:DEF.wv, wp2:DEF.wp2, wa2:DEF.wa2, dv:DEF.dv, d2v:DEF.d2v, d2f:DEF.d2f, d2l:DEF.d2l, us:DEF.us, ip:DEF.ip, st:DEF.st, adv: Object.assign({}, ADV) };
 state.ov = {};
 var COL_OK = /^(light|dark|mark|body|#[0-9a-fA-F]{3,8})$/;
 function resDefaults(r){ return r === 0.5 ? { tx: -2, wp: -1 } : { tx: -3, wp: -2 }; }   // Tami's spacing per resolution
@@ -645,6 +692,7 @@ function readHash(hs){
     if (q.t === "flip" || q.t === "invert") state.t = q.t;
     if (q.r === "1" || q.r === "0.5") state.r = +q.r;
     state.us = q.us === "inch" ? "inch" : "metric";   // links without us= are metric (every link before inch mode)
+    state.st = q.st === "classic" ? "classic" : "band";   // links without st= are the edge (band) style
     state.ip = (q.ip === "8" || q.ip === "16" || q.ip === "32" || q.ip === "10") ? +q.ip : DEF.ip;
     var rd = sysDefaults(state); if (q.tx == null) state.adv.tx = rd.tx; if (q.wp == null) state.wp = rd.wp;   // a link without tx/wp gets its resolution's defaults
     if (q.u === "mm" || q.u === "cm") state.u = q.u;
@@ -673,6 +721,7 @@ function writeHash(){
     var parts = ["t="+state.t, "r="+state.r, "u="+state.u, "l="+state.l, "s="+state.s];
     var INH = state.us === "inch";   // inch: s is in inches, line positions stay in mm (finer: divisions are 25.4/n)
     if (INH) parts.push("us=inch", "ip="+state.ip);
+    if (state.st === "classic") parts.push("st=classic");
     if (state.g !== DEF.g) parts.push("g="+state.g);
     if (INH ? Math.abs(state.wp - sysDefaults(state).wp) > 1e-9 : state.wp !== DEF.wp) parts.push("wp="+(INH ? lineFmt(state.wp) : (+state.wp).toFixed(2)));
     if (state.wa) parts.push("wa="+(+state.wa).toFixed(1));
@@ -801,7 +850,7 @@ rb.addEventListener("click", function(){ state.ov = {}; state.adv = Object.assig
 advEl.appendChild(rb);
 
 /* ===== primary controls ===== */
-["t","r","u","l","g","us","ip"].forEach(function(name){
+["t","r","u","l","g","us","ip","st"].forEach(function(name){
   document.querySelectorAll('input[name="'+name+'"]').forEach(function(el){
     el.addEventListener("change", function(){
       if (name === "r" || name === "us" || name === "ip"){
@@ -832,13 +881,16 @@ var mq = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") :
 var pending = false, lastSvg = "";
 
 function syncControls(){
-  ["t","r","u","l","g","us","ip"].forEach(function(name){
+  ["t","r","u","l","g","us","ip","st"].forEach(function(name){
     document.querySelectorAll('input[name="'+name+'"]').forEach(function(el){ el.checked = String(state[name]) === el.value; });
   });
   var INS = state.us === "inch", LS = lenOf(state);
   document.getElementById("rSeg").style.display = INS ? "none" : "";
   document.getElementById("ipSeg").style.display = INS ? "" : "none";
-  document.getElementById("uCard").style.display = INS ? "none" : "";
+  var CLS = state.st === "classic";
+  document.getElementById("uCard").style.display = INS || CLS ? "none" : "";   // classic metric always reads cm + mm
+  document.getElementById("edgeCard").style.display = CLS ? "none" : "";      // no edge sign / flip lines in classic
+  document.getElementById("advBox").style.display = CLS ? "none" : "";
   document.getElementById("keyLbl").textContent = INS ? "Only inch + ½" : "Only 0·5·10";
   sIn.min = LS[0]; sIn.max = LS[1]; sIn.setAttribute("aria-label", INS ? "Length in inches" : "Length in millimeters");
   sIn.value = state.s;
@@ -900,6 +952,7 @@ function flipPolys(st, W, X0){
 }
 function composite(st){
   var base = build(st, null);
+  if (st.st === "classic") return base;   // classic: no material flip
   var inv = build(Object.assign({}, st, { sw: true }), null);   // same design, materials swapped
   var inner = inv.svg.replace(/^<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "")
     .replace(/id="([^"]+)"/g, 'id="inv-$1"').replace(/url\(#([^)]+)\)/g, 'url(#inv-$1)');
@@ -920,7 +973,7 @@ function placeWipe(){
     ["handle","grab"].forEach(function(id){
       var el = document.getElementById(id + L[0]); if (!el) return;
       el.style.left = L[1] + "%"; el.style.transform = "rotate(" + L[2] + "deg)";
-      el.style.display = state.wv === "1" ? "" : "none";
+      el.style.display = state.wv === "1" && state.st !== "classic" ? "" : "none";
     });
   });
 }
@@ -950,9 +1003,10 @@ window.addEventListener("hashchange", function(){ readHash(); schedule(); });
 
 /* ===== downloads (exports always use the exact reference look) ===== */
 function fname(ext){
-  if (state.us === "inch") return "clevermetric-" + (state.t === "flip" ? "light" : "dark") + "-inch-1-" + state.ip +
+  var CLF = state.st === "classic" ? "-classic" : "";
+  if (state.us === "inch") return "clevermetric-" + (state.t === "flip" ? "light" : "dark") + CLF + "-inch-1-" + state.ip +
     "-" + state.l + "-" + state.s + "in." + ext;
-  return "clevermetric-" + (state.t === "flip" ? "light" : "dark") + "-" + (state.r === 1 ? "1mm" : "half-mm") +
+  return "clevermetric-" + (state.t === "flip" ? "light" : "dark") + CLF + "-" + (state.r === 1 ? "1mm" : "half-mm") +
     "-" + state.u + "-" + state.l + "-" + state.s + "mm." + ext;
 }
 function save(blob, name){
@@ -966,7 +1020,7 @@ function settingsJSON(){
   var INJ = state.us === "inch";
   // inch mode adds unit_system + inch_precision + length_in; every older field keeps its name and meaning
   // (length_mm is the physical length, line positions stay in mm), so a metric file is unchanged
-  return Object.assign({ app: "clevermetric", version: 1 }, INJ ? { unit_system: "inch", inch_precision: state.ip, length_in: state.s } : {}, {
+  return Object.assign({ app: "clevermetric", version: 1 }, INJ ? { unit_system: "inch", inch_precision: state.ip, length_in: state.s } : {}, state.st === "classic" ? { style: "classic" } : {}, {
     theme: state.t, resolution: state.r, unit: state.u, labels: state.l, length_mm: INJ ? +(state.s * IN_MM).toFixed(3) : state.s,
     logo: state.g === "1", invert_line1_mm: +(+state.wp).toFixed(3), invert_line_angle_deg: +(+state.wa).toFixed(2), invert_line_visible: state.wv === "1", invert_line2_mm: +(+state.wp2).toFixed(3), invert_line2_angle_deg: +(+state.wa2).toFixed(2),
     dot_fill: state.df, dot_outline: state.dl, dot_visible: state.dv === "1",
@@ -979,7 +1033,8 @@ function applyJSON(j){
   if (j.resolution === 1 || j.resolution === 0.5) state.r = j.resolution;
   if (j.unit === "mm" || j.unit === "cm") state.u = j.unit;
   if (j.labels === "all" || j.labels === "key") state.l = j.labels;
-  state.us = j.unit_system === "inch" ? "inch" : "metric";   // a file without unit_system is a metric design
+  state.us = j.unit_system === "inch" ? "inch" : "metric";
+  state.st = j.style === "classic" ? "classic" : "band";   // a file without style is the edge (band) design   // a file without unit_system is a metric design
   state.ip = [8, 16, 32, 10].indexOf(+j.inch_precision) >= 0 ? +j.inch_precision : DEF.ip;
   if (state.us === "inch") state.s = isFinite(+j.length_in) ? Math.max(1, Math.min(12, Math.round(+j.length_in))) : LEN.inch[2];
   else if (isFinite(+j.length_mm)) state.s = Math.max(10, Math.min(300, Math.round(+j.length_mm)));
@@ -1045,9 +1100,14 @@ var ED = { z:1, k:1, W:0, geo:null, sel:{ kind:null, keys:[], scope:"one", ancho
   drag:null, tap:null, handles:[], peek:false, peeked:"", multi:false, lastTap:null, insSig:"",
   fields:[], guide:null, zoomFocus:null, keep:null, cropU:0, k1:1, pad:0, fold:false };
 var RANK_LBL = { "0":"0/10", "5":"5", "3":"3/8", "2":"2/7", "1":"1/4/6/9", "h":"½ mm",
-  "in":"inch", "1/2":"½ in", "1/4":"¼ in", "1/8":"⅛ in", "1/16":"1/16 in", "1/32":"1/32 in", "1/10":"1/10 in" };
+  "in":"inch", "1/2":"½ in", "1/4":"¼ in", "1/8":"⅛ in", "1/16":"1/16 in", "1/32":"1/32 in", "1/10":"1/10 in",
+  "d0":"inch", "d5":".5 in", "d3":".3/.8 in", "d2":".2/.7 in", "d1":".1/.4/.6/.9 in" };
 /* unit system (inch mode): marks still live in mm on the drawing; ranks and sizes come from the page's INCH table */
 function isInch(){ return state.us === "inch"; }
+/* classic style: thin centred ticks, no band / edge sign / flip lines; its ranks are a fixed table (like inch) */
+function isClassic(){ return state.st === "classic"; }
+function fixedRanks(){ return isInch() || isClassic(); }
+var BAND_ONLY = /^(tri|dot|dot2|blk|line1|line2)$/;
 function resMM(){ return isInch() ? IN_MM / state.ip : state.r; }          // one division in mm
 function spanMM(){ return isInch() ? state.s * IN_MM : state.s; }
 function divOf(m){ return Math.round(m / resMM()); }
@@ -1064,12 +1124,13 @@ var iTitle = document.getElementById("iTitle"), iScope = document.getElementById
 function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
 function f2(v, d){ return (+v).toFixed(d == null ? 2 : d).replace(/^-/, "−"); }
 function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]; }); }
-function rankOf(m){ if (isInch()) return iRank(divOf(m), state.ip); return Math.abs(m - Math.round(m)) > 1e-9 ? "h" : rank(mod10(Math.round(m))); }
-function rankLeg(m){ return isInch() ? INCH.LEG[rankOf(m)] : state.adv["g" + rankOf(m)]; }
-function rankNum(n){ return isInch() ? INCH.NUM[rankOf(n)] : state.adv["n" + rank(mod10(Math.round(n)))]; }
+function rankOf(m){ if (isClassic() && isInch() && state.ip === 10) return "d" + rank(((divOf(m) % 10) + 10) % 10);
+  if (isInch()) return iRank(divOf(m), state.ip); return Math.abs(m - Math.round(m)) > 1e-9 ? "h" : rank(mod10(Math.round(m))); }
+function rankLeg(m){ return isClassic() ? cLeg(m, state) : isInch() ? INCH.LEG[rankOf(m)] : state.adv["g" + rankOf(m)]; }
+function rankNum(n){ return isClassic() ? cNum(isInch() ? n : mod10(Math.round(n)), state) : isInch() ? INCH.NUM[rankOf(n)] : state.adv["n" + rank(mod10(Math.round(n)))]; }
 function ovOf(key){ return (state.ov && state.ov[key]) || {}; }
 function markH(key){ var o = ovOf(key); return o.h != null ? o.h : rankLeg(+key); }
-function markW(key){ var o = ovOf(key); return o.w != null ? Math.min(o.w, resMM() * 0.49) : state.adv.w; }
+function markW(key){ var o = ovOf(key); return o.w != null ? Math.min(o.w, resMM() * (isClassic() ? 0.9 : 0.49)) : isClassic() ? CLASSIC.TICK : state.adv.w; }
 function numZ(key){ var o = ovOf(key); return o.z != null ? o.z : rankNum(+key); }
 function xU(mm){ return ED.geo.X0e + mm * ED.geo.S; }
 function P(px){ return px / (ED.k || 1); }            // screen px -> SVG user units
@@ -1108,11 +1169,13 @@ function toClient(ux, uy){
 function pick(p, noHandles){
   var G = ED.geo; if (!G) return { kind:"none" };
   var pad = P(18);
+  var CLP = isClassic();
   if (!noHandles) for (var i = 0; i < ED.handles.length; i++){
     var hd = ED.handles[i];
     if (Math.hypot(p.x - hd.x, p.y - hd.y) <= P(14)) return { kind:"handle", h:hd };
   }
   var D2 = G.dot2;
+  if (!CLP){
   if (D2 && Math.hypot(p.x - D2.cx, p.y - D2.cy) <= Math.max(D2.r, pad)) return { kind:"dot2" };
   var T = G.tri, D = G.dot || (G.dotPos && G.dotPos.r > 0 ? G.dotPos : null);
   if (Math.abs(p.x - T.cx) <= Math.max(T.side / 2, pad) &&
@@ -1122,6 +1185,7 @@ function pick(p, noHandles){
   }
   var GD2 = !G.dot2 && G.dot2Pos && G.dot2Pos.r > 0 ? G.dot2Pos : null;   // hidden dot 2: tap its ghost to bring it back
   if (GD2 && Math.hypot(p.x - GD2.cx, p.y - GD2.cy) <= Math.max(GD2.r, pad)) return { kind:"dot2" };
+  }
   for (var j = 0; j < G.nums.length; j++){
     var nm = G.nums[j], hw = Math.max(nm.text.length * 0.3 * nm.size, pad * 0.6);
     if (Math.abs(p.x - nm.x) <= hw && p.y >= nm.base - nm.size * 0.74 - pad * 0.3 && p.y <= nm.base + Math.min(pad * 0.3, 14))
@@ -1131,7 +1195,7 @@ function pick(p, noHandles){
   var LB = logoBox();
   if (LB && p.x >= LB[0] - P(6) && p.x <= LB[2] + P(6) && p.y >= LB[1] - P(6) && p.y <= LB[3] + P(6)) return { kind:"logo" };
   var lineHit = null;
-  for (var li = 1; li <= 2; li++){   // a flip line (shown or hidden) can be touched anywhere it crosses the ruler
+  for (var li = 1; li <= 2 && !CLP; li++){   // a flip line (shown or hidden) can be touched anywhere it crosses the ruler
     var sg = lineSeg(li);
     if (sg && Math.abs(p.x - (sg.c + (70 + H / 2 - p.y) * Math.tan((li === 2 ? state.wa2 : state.wa) * Math.PI / 180))) <= P(7)){ lineHit = { kind:"line" + li }; break; }
   }
@@ -1144,6 +1208,7 @@ function pick(p, noHandles){
     if (d < bd){ bd = d; best = mk; }
   });
   if (!best) return { kind:"none" };
+  if (CLP){ if (p.y < best.y0 - P(10) || bd > Math.max(G.res * G.S * 0.3, P(8))) return { kind:"none" }; return { kind:"tick", key:okey(best.m) }; }
   if (p.y >= G.yk - P(2) && bd > G.res * G.S * 0.3) return { kind:"blk", x:p.x };
   return { kind:"tick", key:okey(best.m) };
 }
@@ -1151,7 +1216,7 @@ function isDraggable(hit){ return /^(handle|tri|dot|dot2|line1|line2)$/.test(hit
 /* FastCap logo + Clevemetric wordmark box (same maths as build(): logo X(1)..X(4.55), wordmark X(5.5)..X(9)) */
 function logoBox(){
   var G = ED.geo; if (!G || spanMM() < 5) return null;
-  var LG = isInch() ? INCH.LOGO : [1, 4.55], WD = isInch() ? INCH.WORD : [5.5, 9];
+  var LG = isClassic() ? CLASSIC.LOGO : isInch() ? INCH.LOGO : [1, 4.55], WD = isClassic() ? CLASSIC.WORD : isInch() ? INCH.WORD : [5.5, 9];
   var lh = (xU(LG[1]) - xU(LG[0])) * 116 / 488, y0 = G.top + 20;
   return [xU(LG[0]), y0, spanMM() >= 9 ? xU(WD[1]) : xU(LG[1]), y0 + lh];
 }
@@ -1165,6 +1230,7 @@ function lineSeg(n){
 
 /* ---------- selection ---------- */
 function setSel(kind, keys, scope, anchor, x){
+  if (isClassic() && BAND_ONLY.test(kind || "")) kind = null;   // classic has no triangle, dots, block or flip lines
   keys = (keys || []).slice().sort(function(a, b){ return a - b; });
   ED.sel = { kind:kind || null, keys:keys, scope:scope || "one", anchor:anchor != null ? anchor : (keys[0] != null ? keys[0] : null), x:x != null ? x : null };
   ED.insSig = "";
@@ -1180,12 +1246,14 @@ function pruneSel(){
     if (!s.keys.length && s.scope !== "rank"){ ED.sel = { kind:null, keys:[], scope:"one", anchor:null, x:null }; ED.insSig = ""; }
     if (s.scope === "rank" && s.anchor == null){ ED.sel = { kind:null, keys:[], scope:"one", anchor:null, x:null }; ED.insSig = ""; }
   }
+  if (isClassic() && BAND_ONLY.test(s.kind)){ ED.sel = { kind:null, keys:[], scope:"one", anchor:null, x:null }; ED.insSig = ""; return; }
   if ((s.kind === "dot" && !G.dotPos) || (s.kind === "dot2" && !G.dot2Pos) || (s.kind === "logo" && !logoBox())){ ED.sel = { kind:null, keys:[], scope:"one", anchor:null, x:null }; ED.insSig = ""; }
 }
 function tapSelect(hit, e){
   var add = ED.multi || e.metaKey || e.ctrlKey, range = e.shiftKey;
   if (hit.kind === "handle") return;
   if (hit.kind === "none"){ if (!add && ED.sel.kind) setSel(null); return; }
+  if (isClassic() && BAND_ONLY.test(hit.kind)) return;
   if (/^(tri|dot|dot2|blk|logo|line1|line2)$/.test(hit.kind)){ setSel(hit.kind, [], "one", null, hit.x); return; }
   var key = hit.key, now = Date.now(), lt = ED.lastTap, s = ED.sel;
   var dbl = !add && !range && lt && lt.key === key && lt.kind === hit.kind && now - lt.t < 380;
@@ -1222,7 +1290,7 @@ function advField(key, label){
   return F;
 }
 function ovField(keys, f, label, step, dec, dfltFn){
-  var lim = f === "w" ? [OV_F.w[0], +(resMM() * 0.49).toFixed(3)] : OV_F[f];
+  var lim = f === "w" ? [OV_F.w[0], +Math.min(OV_F.w[1], resMM() * (isClassic() ? 0.9 : 0.49)).toFixed(3)] : OV_F[f];
   var val = f === "h" ? markH : f === "w" ? markW : numZ;
   function put(key, v){
     v = +clamp(v, lim[0], lim[1]).toFixed(3);
@@ -1281,12 +1349,12 @@ function fieldsFor(){
   var s = ED.sel, F = [];
   if (s.kind === "tick" || s.kind === "num"){
     var r = s.anchor != null ? rankOf(+s.anchor) : "1";
-    if (s.scope === "rank" && isInch()){   // inch ranks are fixed: a rank edit writes every mark of the rank
+    if (s.scope === "rank" && fixedRanks()){   // inch / classic ranks are fixed: a rank edit writes every mark of the rank
       var rk = selKeys(), rnk = rk.filter(function(k){ return !!findNum(k); });
       var rH = ovField(rk, "h", "Leg height · rank " + RANK_LBL[r] + " (mm)", 0.05, 2, function(k){ return rankLeg(+k); });
       var rZ = rnk.length ? ovField(rnk, "z", "Numeral size · rank " + RANK_LBL[r], 2, 0, function(k){ return rankNum(+k); }) : null;
       if (s.kind === "num"){ if (rZ) F.push(rZ); F.push(rH); }
-      else { F.push(rH, advField("w", "Leg thickness · whole ruler (mm)")); if (rZ) F.push(rZ); }
+      else { F.push(rH, isClassic() ? ovField(rk, "w", "Tick thickness · rank " + RANK_LBL[r] + " (mm)", 0.005, 3, function(){ return CLASSIC.TICK; }) : advField("w", "Leg thickness · whole ruler (mm)")); if (rZ) F.push(rZ); }
     } else if (s.scope === "rank"){
       if (s.kind === "num" && r !== "h") F.push(advField("n" + r, "Numeral size · rank " + RANK_LBL[r]));
       F.push(advField("g" + r, "Leg height · rank " + RANK_LBL[r] + " (mm)"));
@@ -1297,7 +1365,7 @@ function fieldsFor(){
     } else {
       var keys = s.keys;
       var hF = ovField(keys, "h", "Leg height (mm)", 0.05, 2, function(k){ return rankLeg(+k); });
-      var wF = ovField(keys, "w", "Leg thickness (mm)", 0.005, 3, function(){ return state.adv.w; });
+      var wF = ovField(keys, "w", "Leg thickness (mm)", 0.005, 3, function(){ return isClassic() ? CLASSIC.TICK : state.adv.w; });
       var nk = keys.filter(function(k){ return !!findNum(k); });
       var zF = nk.length ? ovField(nk, "z", "Numeral size", 2, 0, function(k){ return rankNum(+k); }) : null;
       if (s.kind === "tick"){ F.push(hF, wF); if (zF) F.push(zF); }
@@ -1481,7 +1549,7 @@ function drawHover(hit){
 
 /* ---------- inspector ---------- */
 function renderInspector(){
-  var s = ED.sel, sig = [s.kind, s.keys.join(","), s.scope, s.anchor, state.r, state.l, state.s, state.us, state.ip].join("|");
+  var s = ED.sel, sig = [s.kind, s.keys.join(","), s.scope, s.anchor, state.r, state.l, state.s, state.us, state.ip, state.st].join("|");
   if (sig !== ED.insSig){ ED.insSig = sig; buildInspector(); }
   updateInspector();
 }
@@ -1569,7 +1637,8 @@ function updateInspector(){
   function row(label, val){ P_.push(label + ": <b>" + val + "</b>"); }
   if (!s.kind){
     title = 'Nothing selected <small>· tap any part of the ruler to edit it</small>';
-    acts.push(["pick-tri", "Triangle"], ["pick-dot", "Dot 1"], ["pick-dot2", "Dot 2"], ["pick-line1", "Line 1"], ["pick-line2", "Line 2"], ["pick-blk", "Block"]);
+    if (isClassic()) title = 'Nothing selected <small>· Classic style · tap any tick, numeral or the logo to edit it</small>';
+    else acts.push(["pick-tri", "Triangle"], ["pick-dot", "Dot 1"], ["pick-dot2", "Dot 2"], ["pick-line1", "Line 1"], ["pick-line2", "Line 2"], ["pick-blk", "Block"]);
     if (spanMM() >= 5) acts.push(["pick-logo", "Logo"]);
     var n = Object.keys(state.ov || {}).length;
     if (n){ P_.push('<b>' + n + '</b> ticks/numerals with their own value'); acts.push(["clear-all-ov", "Clear all individual values"]); }
@@ -1584,15 +1653,15 @@ function updateInspector(){
       var h = markH(A), w = markW(A), dfl = rankLeg(+A), res = resMM();
       row("Leg", f2(h) + " mm" + (Math.abs(h - dfl) > 1e-9 ? " (rank " + f2(dfl) + ")" : ""));
       row("Thickness", f2(w, 3) + " mm");
-      row(isInch() ? "vs inch" : "vs 0/10", Math.round(h / (isInch() ? INCH.LEG["in"] : a.g0) * 100) + "%");
+      row(isInch() ? "vs inch" : "vs 0/10", Math.round(h / (isClassic() ? CLASSIC.TOP : isInch() ? INCH.LEG["in"] : a.g0) * 100) + "%");
       var L = findMark(okey(divOf(+A) * res - res)), R = findMark(okey(divOf(+A) * res + res));
       if (L || R) row("Neighbours", (L ? f2(L.h) : "–") + " ← · → " + (R ? f2(R.h) : "–"));
-      row("Above the block", f2(h - a.b) + " mm");
-      if (h <= a.b) P_.push('<span class="warnline">⚠ The leg is shorter than the block depth — it gets swallowed</span>');
+      if (!isClassic()) row("Above the block", f2(h - a.b) + " mm");
+      if (!isClassic() && h <= a.b) P_.push('<span class="warnline">⚠ The leg is shorter than the block depth — it gets swallowed</span>');
     }
     if (A != null && findNum(A)){
       var z = numZ(A);
-      row("Numeral", z + " (" + f2(z / S) + " mm) · " + (isInch() ? "vs inch ×" + f2(z / INCH.NUM["in"]) : "vs 0/10 ×" + f2(z / a.n0)));
+      row("Numeral", z + " (" + f2(z / S) + " mm) · " + (isClassic() && !isInch() ? "vs cm ×" + f2(z / CLASSIC.NUM[0]) : isInch() ? "vs inch ×" + f2(z / INCH.NUM["in"]) : "vs 0/10 ×" + f2(z / a.n0)));
     }
     if (s.scope === "rank"){
       var priv = keys.filter(function(k){ var o = ovOf(k); return isN ? o.z != null : (o.h != null || o.w != null); }).length;
@@ -1749,7 +1818,7 @@ function dragApply(e){
     a.b = clamp(snap(A0.b + dy, Math.min(st, 0.05)), 0.1, 1);
   } else if (id === "h" || id === "w" || id === "z"){
     var keys = selKeys(), r = s.anchor != null ? rankOf(+s.anchor) : "1";
-    if (s.scope === "rank" && !isInch()){
+    if (s.scope === "rank" && !fixedRanks()){
       if (id === "h") a["g" + r] = clamp(snap(A0["g" + r] + dy, st), 0.2, 3.3);
       else if (id === "w") a.w = clamp(snap(A0.w + (findMark(s.anchor).side === "L" ? dx : -dx), 0.005), 0.03, 0.3);
       else if (r !== "h") a["n" + r] = clamp(Math.round(A0["n" + r] + dy * S), 12, 120);
@@ -1767,8 +1836,9 @@ function dragApply(e){
           if (Math.abs(nv - dfl) * pm < 5) nv = dfl;
           ovSet(state.ov, +k, "h", Math.abs(nv - dfl) < 1e-9 ? null : nv);
         } else {
-          var w0 = o0.w != null ? o0.w : a.w, nw = clamp(snap(w0 + (side === "L" ? dx : -dx), 0.005), 0.01, +(resMM() * 0.49).toFixed(3));
-          ovSet(state.ov, +k, "w", Math.abs(nw - a.w) < 1e-9 ? null : nw);
+          var wd = isClassic() ? CLASSIC.TICK : a.w, w0 = o0.w != null ? o0.w : wd;
+          var nw = clamp(snap(w0 + (side === "L" ? dx : side === "C" ? -2 * dx : -dx), 0.005), 0.01, +Math.min(OV_F.w[1], resMM() * (isClassic() ? 0.9 : 0.49)).toFixed(3));
+          ovSet(state.ov, +k, "w", Math.abs(nw - wd) < 1e-9 ? null : nw);
         }
       });
     }
@@ -1852,7 +1922,7 @@ scroller.addEventListener("contextmenu", function(e){ if (e.pointerType !== "mou
 var EXT0 = null, EXT0K = "";
 function extOf(geo){ return (geo.X0e - X0) / S; }
 function ext0(){
-  var key = isInch() ? "in" + state.ip : "m";
+  var key = (isInch() ? "in" + state.ip : "m") + state.st;
   if (EXT0 == null || EXT0K !== key){
     EXT0K = key;
     var dadv = Object.assign({}, ADV, isInch() ? { tx: sysDefaults(state).tx } : {});
@@ -1976,7 +2046,7 @@ document.addEventListener("keydown", function(e){
     else if (k === "[") done = nudge(s.kind === "tri" ? "ts" : "dd", s.kind === "tri" ? -0.05 : -0.01);
     else if (k === "]") done = nudge(s.kind === "tri" ? "ts" : "dd", s.kind === "tri" ? 0.05 : 0.01);
   } else if (s.kind === "tick" || s.kind === "num"){
-    var RS = s.scope === "rank" && !isInch(), r = s.anchor != null ? rankOf(+s.anchor) : "1", hid = RS ? "g" + r : "h", zid = RS ? "n" + r : "z";
+    var RS = s.scope === "rank" && !fixedRanks(), r = s.anchor != null ? rankOf(+s.anchor) : "1", hid = RS ? "g" + r : "h", zid = RS ? "n" + r : "z";
     if (k === "ArrowLeft"){ stepSel(-1, e.shiftKey); done = true; }
     else if (k === "ArrowRight"){ stepSel(1, e.shiftKey); done = true; }
     else if (k === "ArrowUp") done = s.kind === "num" ? nudge(zid, fine ? 1 : 2) : nudge(hid, fine ? 0.01 : 0.05);
