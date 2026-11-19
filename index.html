@@ -170,6 +170,9 @@ footer{overflow-wrap:anywhere;color:var(--muted);font-size:12.5px;margin:22px 2p
       <div class="actions">
         <button class="btn primary" id="dlPng" type="button">PNG ⤓</button>
         <button class="btn" id="dlSvg" type="button">SVG ⤓</button>
+        <button class="btn" id="dlJson" type="button">שמירת הגדרות JSON ⤓</button>
+        <button class="btn" id="ldJson" type="button">טעינת הגדרות ⤒</button>
+        <input type="file" id="ldFile" accept="application/json,.json" hidden>
       </div>
     </div>
   </div>
@@ -515,6 +518,40 @@ function save(blob, name){
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(function(){ URL.revokeObjectURL(url); }, 30000);
 }
+/* settings as JSON: every control, the slider position, colours, logo and all advanced values */
+function settingsJSON(){
+  return { app: "clevermetric", version: 1,
+    theme: state.t, resolution: state.r, unit: state.u, labels: state.l, length_mm: state.s,
+    logo: state.g === "1", invert_slider_pct: +(+state.wp).toFixed(2),
+    dot_fill: state.df, dot_outline: state.dl,
+    advanced: Object.assign({}, state.adv) };
+}
+function applyJSON(j){
+  if (!j || j.app !== "clevermetric") throw new Error("not a Clevermetric settings file");
+  if (j.theme === "flip" || j.theme === "invert") state.t = j.theme;
+  if (j.resolution === 1 || j.resolution === 0.5) state.r = j.resolution;
+  if (j.unit === "mm" || j.unit === "cm") state.u = j.unit;
+  if (j.labels === "all" || j.labels === "key") state.l = j.labels;
+  if (isFinite(+j.length_mm)) state.s = Math.max(10, Math.min(300, Math.round(+j.length_mm)));
+  if (typeof j.logo === "boolean") state.g = j.logo ? "1" : "0";
+  if (isFinite(+j.invert_slider_pct)) state.wp = Math.max(0, Math.min(100, +j.invert_slider_pct));
+  if (j.dot_fill && COL_OK.test(j.dot_fill)) state.df = j.dot_fill;
+  if (j.dot_outline && COL_OK.test(j.dot_outline)) state.dl = j.dot_outline;
+  if (j.advanced) Object.keys(ADV).forEach(function(k){ if (isFinite(+j.advanced[k])) state.adv[k] = +j.advanced[k]; });
+  lastSvg = ""; schedule();
+}
+document.getElementById("dlJson").addEventListener("click", function(){
+  save(new Blob([JSON.stringify(settingsJSON(), null, 2)], { type: "application/json" }), fname("json"));
+});
+var ldFile = document.getElementById("ldFile");
+document.getElementById("ldJson").addEventListener("click", function(){ ldFile.click(); });
+ldFile.addEventListener("change", function(){
+  var f = ldFile.files && ldFile.files[0]; if (!f) return;
+  var r = new FileReader();
+  r.onload = function(){ try { applyJSON(JSON.parse(r.result)); } catch (e) { alert("הקובץ לא נטען: " + e.message); } ldFile.value = ""; };
+  r.readAsText(f);
+});
+window.__clever.settingsJSON = settingsJSON; window.__clever.applyJSON = applyJSON;
 document.getElementById("dlSvg").addEventListener("click", function(){
   save(new Blob([build(state, null).svg], { type: "image/svg+xml" }), fname("svg"));
 });
